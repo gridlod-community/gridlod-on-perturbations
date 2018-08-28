@@ -1,15 +1,14 @@
-# This file is part of the paper for "Localization of multiscale problems with random defects"
-#   https://github.com/TiKeil/Masterthesis-LOD.git
+# This file is part of the project for "Localization of multiscale problems with random defects":
+#   https://github.com/gridlod-community/gridlod-on-perturbations.git
 # Copyright holder: Tim Keil
-
+# License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 from gridlod import util, world, fem, femsolver
 from gridlod.world import World
-import femsolverCoarse, buildcoef2d
-
+import psi_functions
 
 # this fine resolution should be enough
 fine = 512
@@ -18,14 +17,12 @@ NpFine = np.prod(NFine + 1)
 # list of coarse meshes
 NList = [2, 4, 8, 16, 32, 64, 128, 256]
 
+
 # construction of the coefficients.
-# The plot is ecactly what we want and the perturbation is
-# a plateau with
-# y = x + alpha * psi(x)
-# psi(x) =          ______      1/2
-#                 /        \
-#               /            \
-#              1 1/4 1/2 3/4  1
+# The plot is ecactly what we want and
+
+alpha = 1./4.
+psi = psi_functions.plateau_1d(alpha)
 
 
 aFine = np.ones(fine)
@@ -45,15 +42,9 @@ xtCoarse = util.tCoordinates(NFine).flatten()
 a_transformed = np.copy(aFine)
 alpha = 1./4.
 for k in range(0, np.shape(xtCoarse)[0]):
-    if (xtCoarse[k] < 1./4. + alpha/2):
-        transformed_x = xtCoarse[k]  * (1/(1+2* alpha))
-    if ((xtCoarse[k] >= 1./4. + alpha/2) & (xtCoarse[k] <= 3/4. + alpha/2)):
-        transformed_x = xtCoarse[k]  - alpha/2.
-    if (xtCoarse[k] > 3/4. + alpha/2):
-        transformed_x = (xtCoarse[k] - alpha*2)/ (1-2* alpha)
+    transformed_x = psi.evaluate(xtCoarse[k])
 
     # print('point {} has been transformed to {} and the new index is {}'.format(xpCoarse[k],transformed_x,index_search(transformed_x, xpCoarse)-1))
-
     a_transformed[k] = aFine[int(transformed_x*NFine)]
 
 aPert = a_transformed
@@ -66,14 +57,9 @@ jAj = np.copy(aFine)
 
 for i in range(fine):
     point = xtCoarse[i]
-    if (point < 1./4.):
-        detJ = (1 + 2 * alpha)
-    if ((point >= 1./4.) & (point <= 3/4.)):
-        detJ =  1.
-    if (point > 3/4.):
-        detJ = (1 - 2 * alpha)
-
-    jAj[i] *= 1./detJ  # what value is supposed to be here ???
+    J = psi.J(point)
+    detJ = psi.detJ(point)
+    jAj[i] *= detJ/(J*J)  # NOTE: one dimensional case
 
 # interior nodes for plotting
 xt = util.tCoordinates(NFine).flatten()
@@ -83,12 +69,7 @@ f = np.ones(fine + 1)
 f_pert = np.copy(f)
 for i in range(0, fine+1):
     point = xpCoarse[i]
-    if (point < 1./4.):
-        detJ = (1. + 2 * alpha)
-    if ((point >= 1./4.) & (point <= 3/4.)):
-        detJ =  1.
-    if (point > 3/4.):
-        detJ = (1. - 2 * alpha)
+    detJ = psi.detJ(point)
     f_pert[i] *= detJ
 
 plt.figure('right hand side')
@@ -137,14 +118,7 @@ for N in NList:
     k = 0
 
     for k in range(0, np.shape(xpCoarse)[0]):
-        if (xpCoarse[k] < 1. / 4. + alpha / 2):
-            transformed_x = xpCoarse[k] * (1 / (1 + 2 * alpha))
-        if ((xpCoarse[k] >= 1. / 4. + alpha / 2) & (xpCoarse[k] <= 3 / 4. + alpha / 2)):
-            transformed_x = xpCoarse[k] - alpha / 2.
-        if (xpCoarse[k] > 3 / 4. + alpha / 2):
-            transformed_x = (xpCoarse[k] - alpha * 2) / (1 - 2 * alpha)
-
-        # print('point {} has been transformed to {} and the new index is {}'.format(xpCoarse[k],transformed_x,index_search(transformed_x, xpCoarse)))
+        transformed_x = psi.evaluate(xpCoarse[k])
         uCoarseFull_transformed[k] = uCoarseFullJAJ[int(transformed_x*NFine)]
 
     energy_error.append(np.sqrt(np.dot(uCoarseFull - uCoarseFull_transformed, AFine * (uCoarseFull - uCoarseFull_transformed))))
