@@ -7,8 +7,8 @@ import numpy as np
 
 class plateau_1d:
     # the perturbation is a plateau with
-    # y = x + alpha * psi(x)
-    # psi(x) =          ______      1/2
+    # y = psi(x) = x + alpha * xi(x)
+    # xi(x) =           ______      1/2
     #                 /        \
     #               /            \
     #              1 1/4 1/2 3/4  1
@@ -16,7 +16,7 @@ class plateau_1d:
     def __init__(self, alpha):
         self.alpha = alpha
 
-    def evaluate(self, x):
+    def inverse_evaluate(self, x):
         alpha = self.alpha
         if (x < 1. / 4. + alpha / 2):
             return x * (1 / (1 + 2 * alpha))
@@ -24,6 +24,15 @@ class plateau_1d:
             return x - alpha / 2.
         if (x > 3 / 4. + alpha / 2):
             return (x - alpha * 2.) / (1 - 2. * alpha)
+
+    def evaluate(self, x):
+        alpha = self.alpha
+        if (x < 1. / 4.):
+            return x + alpha*2*x
+        if ((1. / 4. <= x) & (x <= 3 / 4. )):
+            return x + alpha/2
+        if (x > 3 / 4.):
+            return x + alpha * (2. - 2. * x)
 
     def J(self, x):
         alpha = self.alpha

@@ -17,13 +17,8 @@ NpFine = np.prod(NFine + 1)
 # list of coarse meshes
 NList = [2, 4, 8, 16, 32, 64, 128, 256]
 
-
-# construction of the coefficients.
-# The plot is ecactly what we want and
-
 alpha = 1./4.
 psi = psi_functions.plateau_1d(alpha)
-
 
 aFine = np.ones(fine)
 aFine /= 10
@@ -42,7 +37,7 @@ xtCoarse = util.tCoordinates(NFine).flatten()
 a_transformed = np.copy(aFine)
 alpha = 1./4.
 for k in range(0, np.shape(xtCoarse)[0]):
-    transformed_x = psi.evaluate(xtCoarse[k])
+    transformed_x = psi.inverse_evaluate(xtCoarse[k])
 
     # print('point {} has been transformed to {} and the new index is {}'.format(xpCoarse[k],transformed_x,index_search(transformed_x, xpCoarse)-1))
     a_transformed[k] = aFine[int(transformed_x*NFine)]
@@ -88,6 +83,15 @@ plt.ylabel('$y$', fontsize=16)
 plt.xlabel('$x$', fontsize=16)
 plt.legend(frameon=False, fontsize=16)
 
+plt.figure('psi visualization')
+ret = np.zeros(np.shape(xpCoarse)[0])
+inverse_ret = np.copy(ret)
+for k in range(0,np.shape(xpCoarse)[0]):
+    ret[k] = psi.evaluate(xpCoarse[k])
+    inverse_ret[k] = psi.inverse_evaluate(xpCoarse[k])
+plt.plot(xpCoarse,ret)
+plt.plot(xpCoarse,xpCoarse)
+plt.plot(xpCoarse,inverse_ret)
 
 exact_problem = []
 transformed_problem = []
@@ -118,7 +122,7 @@ for N in NList:
     k = 0
 
     for k in range(0, np.shape(xpCoarse)[0]):
-        transformed_x = psi.evaluate(xpCoarse[k])
+        transformed_x = psi.inverse_evaluate(xpCoarse[k])
         uCoarseFull_transformed[k] = uCoarseFullJAJ[int(transformed_x*NFine)]
 
     energy_error.append(np.sqrt(np.dot(uCoarseFull - uCoarseFull_transformed, AFine * (uCoarseFull - uCoarseFull_transformed))))
