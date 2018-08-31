@@ -5,6 +5,28 @@
 
 import numpy as np
 
+class smooth_1d:
+    # the perturbation is defined as
+    # y = psi(x) = x + alpha * (1-x)x
+    def __init__(self, alpha):
+        self.alpha = alpha
+
+    def inverse_evaluate(self, x):
+        alpha = self.alpha
+        return (alpha+1)/(2 *alpha) - np.sqrt(alpha**2-4*alpha*x+2*alpha+1)/(2*alpha)
+
+    def evaluate(self, x):
+        alpha = self.alpha
+        return x + alpha * (1-x)*x
+
+    def J(self, x):
+        alpha = self.alpha
+        return (-2*alpha*x) + alpha + 1
+
+    def detJ(self, x):
+        return self.J(x)
+
+
 class plateau_1d:
     # the perturbation is a plateau with
     # y = psi(x) = x + alpha * xi(x)
