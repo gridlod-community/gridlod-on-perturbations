@@ -15,10 +15,10 @@ fine = 512
 NFine = np.array([fine])
 NpFine = np.prod(NFine + 1)
 # list of coarse meshes
-NList = [2, 4, 8, 16, 32, 64, 128, 256]
+NList = [128, 256]
 
 alpha = 1.
-psi = psi_functions.smooth_1d(alpha)
+psi = psi_functions.smooth_1d(NFine, alpha)
 
 aFine = np.ones(fine)
 aFine /= 10
@@ -34,43 +34,20 @@ for i in range(int(fine* 5/8.) - 1, int(fine * 6/8.) - 1):
 xpCoarse = util.pCoordinates(NFine).flatten()
 xtCoarse = util.tCoordinates(NFine).flatten()
 
-a_transformed = np.copy(aFine)
-alpha = 1./4.
-for k in range(0, np.shape(xtCoarse)[0]):
-    transformed_x = psi.inverse_evaluate(xtCoarse[k])
+aPert = psi.inverse_transformation(aFine, xtCoarse)
 
-    # print('point {} has been transformed to {} and the new index is {}'.format(xpCoarse[k],transformed_x,index_search(transformed_x, xpCoarse)-1))
-    a_transformed[k] = aFine[int(transformed_x*NFine)]
+jAj = psi.apply_transformation_to_bilinear_form(aFine, xtCoarse)
 
-aPert = a_transformed
-
-# this is the mesh size
-delta_h = 1. / fine
-
-# jAj is the perturbed reference coefficient
-jAj = np.copy(aFine)
-
-for i in range(fine):
-    point = xtCoarse[i]
-    J = psi.J(point)
-    detJ = psi.detJ(point)
-    jAj[i] *= detJ/(J*J)  # NOTE: one dimensional case
-
-# interior nodes for plotting
-xt = util.tCoordinates(NFine).flatten()
-
-# This is the right hand side and the one occuring from the transformation
 f = np.ones(fine + 1)
-f_pert = np.copy(f)
-for i in range(0, fine+1):
-    point = xpCoarse[i]
-    detJ = psi.detJ(point)
-    f_pert[i] *= detJ
+f_pert = psi.apply_transformation_to_linear_functional(f, xpCoarse)
 
 plt.figure('right hand side')
 plt.plot(np.arange(fine + 1), f, label='NT')
 plt.plot(np.arange(fine + 1), f_pert, label='TR')
 plt.legend()
+
+# interior nodes for plotting
+xt = util.tCoordinates(NFine).flatten()
 
 # plot coefficients and compare them
 plt.figure('Coefficient_pert')
@@ -84,11 +61,8 @@ plt.xlabel('$x$', fontsize=16)
 plt.legend(frameon=False, fontsize=16)
 
 plt.figure('psi visualization')
-ret = np.zeros(np.shape(xpCoarse)[0])
-inverse_ret = np.copy(ret)
-for k in range(0,np.shape(xpCoarse)[0]):
-    ret[k] = psi.evaluate(xpCoarse[k])
-    inverse_ret[k] = psi.inverse_evaluate(xpCoarse[k])
+ret = psi.evaluate(xpCoarse)
+inverse_ret = psi.inverse_evaluate(xpCoarse)
 plt.plot(xpCoarse,ret)
 plt.plot(xpCoarse,xpCoarse)
 plt.plot(xpCoarse,inverse_ret)
@@ -115,9 +89,7 @@ for N in NList:
     uFineFull_transformed = np.copy(uFineFullJAJ)
     k = 0
 
-    for k in range(0, np.shape(xpCoarse)[0]):
-        transformed_x = psi.inverse_evaluate(xpCoarse[k])
-        uFineFull_transformed[k] = uFineFullJAJ[int(transformed_x*NFine)]
+    uFineFull_transformed = psi.inverse_transformation(uFineFullJAJ, xpCoarse)
 
     energy_error.append(np.sqrt(np.dot(uFineFull - uFineFull_transformed, AFine * (uFineFull - uFineFull_transformed))))
     exact_problem.append(uFineFull)
@@ -132,7 +104,7 @@ plt.loglog(NList,energy_error,'o-', basex=2, basey=2)
 plt.legend(frameon=False, fontsize="small")
 
 plt.figure('smallest error')
-error = exact_problem[7] - transformed_problem[7]
+error = exact_problem[1] - transformed_problem[1]
 plt.plot(xpCoarse, error)
 
 
@@ -142,7 +114,7 @@ plt.subplots_adjust(left=0.01, bottom=0.04, right=0.99, top=0.95, wspace=0.1, hs
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 for i in xrange(len(NList)):
-    plt.subplot(2,4,i+1)
+    plt.subplot(1,2,i+1)
     plt.plot(x[i], exact_problem[i], '--', label='EX')
     plt.plot(x[i], non_transformed_problem[i], '--', label='NT')
     plt.plot(x[i], transformed_problem[i], '--', label='T')

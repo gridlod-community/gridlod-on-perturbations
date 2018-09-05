@@ -8,7 +8,8 @@ import numpy as np
 class smooth_1d:
     # the perturbation is defined as
     # y = psi(x) = x + alpha * (1-x)x
-    def __init__(self, alpha):
+    def __init__(self, NFine, alpha):
+        self.NFine = NFine
         self.alpha = alpha
 
     def inverse_evaluate(self, x):
@@ -25,6 +26,39 @@ class smooth_1d:
 
     def detJ(self, x):
         return self.J(x)
+
+    def transformation(self, function, x_values):
+        assert(np.size(function) == np.size(x_values))
+        x_transformed = self.evaluate(x_values)
+        new_function = np.copy(function)
+        for i in range(np.shape(x_values)[0]):
+            new_function[i] = function[int(x_transformed[i] * self.NFine)]
+        return new_function
+
+    def inverse_transformation(self, function, x_values):
+        assert(np.size(function) == np.size(x_values))
+        x_transformed = self.inverse_evaluate(x_values)
+        new_function = np.copy(function)
+        for i in range(np.shape(x_values)[0]):
+            new_function[i] = function[int(x_transformed[i] * self.NFine)]
+        return new_function
+
+    def apply_transformation_to_bilinear_form(self, aFine_in, x_values):
+        assert (np.size(aFine_in) == np.size(x_values))
+        aFine_out = np.copy(aFine_in)
+        J = self.J(x_values)
+        detJ = self.detJ(x_values)
+        for i in range(np.shape(x_values)[0]):
+            aFine_out[i] *= detJ[i] / (J[i] * J[i])  # NOTE: one dimensional case
+        return aFine_out
+
+    def apply_transformation_to_linear_functional(self, f_in, x_values):
+        assert (np.size(f_in) == np.size(x_values))
+        f_out = np.copy(f_in)
+        detJ = self.detJ(x_values)
+        for i in range(np.shape(x_values)[0]):
+            f_out[i] *= detJ[i]
+        return f_out
 
 
 class plateau_1d:
