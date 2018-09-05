@@ -104,31 +104,25 @@ for N in NList:
 
     NCoarseElement = NFine / NWorldCoarse
     world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
-    AFine = fem.assemblePatchMatrix(NFine, world.ALocFine, aPert)
-    jAjFine = fem.assemblePatchMatrix(NFine, world.ALocFine, jAj)
 
     # grid nodes
     xpCoarse = util.pCoordinates(NFine).flatten()
     x.append(xpCoarse)
     NpCoarse = np.prod(NWorldCoarse + 1)
-    uCoarseFull, nothing = femsolver.solveCoarse(world, aPert, f, None, boundaryConditions)
-    uCoarseFullJAJ, nothing = femsolver.solveCoarse(world, jAj, f_pert, None, boundaryConditions)
+    uFineFull, AFine, nothing = femsolver.solveFine(world, aPert, f, None, boundaryConditions)
+    uFineFullJAJ, jAjFine, nothing = femsolver.solveFine(world, jAj, f_pert, None, boundaryConditions)
 
-    basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
-    uCoarseFull = basis * uCoarseFull
-    uCoarseFullJAJ = basis * uCoarseFullJAJ
-
-    uCoarseFull_transformed = np.copy(uCoarseFullJAJ)
+    uFineFull_transformed = np.copy(uFineFullJAJ)
     k = 0
 
     for k in range(0, np.shape(xpCoarse)[0]):
         transformed_x = psi.inverse_evaluate(xpCoarse[k])
-        uCoarseFull_transformed[k] = uCoarseFullJAJ[int(transformed_x*NFine)]
+        uFineFull_transformed[k] = uFineFullJAJ[int(transformed_x*NFine)]
 
-    energy_error.append(np.sqrt(np.dot(uCoarseFull - uCoarseFull_transformed, AFine * (uCoarseFull - uCoarseFull_transformed))))
-    exact_problem.append(uCoarseFull)
-    non_transformed_problem.append(uCoarseFullJAJ)
-    transformed_problem.append(uCoarseFull_transformed)
+    energy_error.append(np.sqrt(np.dot(uFineFull - uFineFull_transformed, AFine * (uFineFull - uFineFull_transformed))))
+    exact_problem.append(uFineFull)
+    non_transformed_problem.append(uFineFullJAJ)
+    transformed_problem.append(uFineFull_transformed)
 
 
 # here, we compare the solutions.
