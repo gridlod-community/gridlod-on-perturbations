@@ -76,7 +76,6 @@ for k in range(0, np.shape(xtCoarse)[0]):
     jAj_reshape[int(xtCoarse[k, 0] * fine), int(xtCoarse[k, 1] * fine)] *= psi.detJ(xtCoarse[k]) * Jinv * np.transpose(Jinv)
 
 jAj = jAj_reshape.reshape(fine*fine,2,2)
-
 #print jAj
 # TODO: Visualization for matrix valued coefficients
 
@@ -99,56 +98,51 @@ for N in NList:
 
     NCoarseElement = NFine / NWorldCoarse
     world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
-    AFine = fem.assemblePatchMatrix(NFine, world.ALocFine, aPert.flatten())
-    jAjFine = fem.assemblePatchMatrix(NFine, world.ALocMatrixFine, jAj)
-
+ 
     # grid nodes
     xpCoarse = util.pCoordinates(NFine)
     x.append(xpCoarse)
     NpCoarse = np.prod(NWorldCoarse + 1)
-    uCoarseFull, nothing = femsolver.solveCoarse(world, aPert.flatten(), f, None, boundaryConditions)
-    uCoarseFullJAJ, nothing = femsolver.solveCoarse(world, jAj, f_pert, None, boundaryConditions)
 
-    basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
-    uCoarseFull = basis * uCoarseFull
-    uCoarseFullJAJ = basis * uCoarseFullJAJ
+    uFineFull, AFine, nothing = femsolver.solveFine(world, aPert.flatten(), f, None, boundaryConditions)
+    uFineFullJAJ, jAjFine, nothing = femsolver.solveFine(world, jAj, f_pert, None, boundaryConditions)
 
-    uCoarseFullJAJ_reshaped = uCoarseFullJAJ.reshape(NFine+1)
-    uCoarseFull_transformed_reshaped = np.copy(uCoarseFullJAJ_reshaped)
+    uFineFullJAJ_reshaped = uFineFullJAJ.reshape(NFine+1)
+    uFineFull_transformed_reshaped = np.copy(uFineFullJAJ_reshaped)
 
 
     for k in range(0, np.shape(xpCoarse)[0]):
         transformed_x = psi.inverse_evaluate(xpCoarse[k])
-        uCoarseFull_transformed_reshaped[int(xpCoarse[k, 0] * fine), int(xpCoarse[k, 1] * fine)] = uCoarseFullJAJ_reshaped[
+        uFineFull_transformed_reshaped[int(xpCoarse[k, 0] * fine), int(xpCoarse[k, 1] * fine)] = uFineFullJAJ_reshaped[
             int(transformed_x[0] * fine), int(transformed_x[1] * fine)]
 
-    uCoarseFull_transformed = uCoarseFull_transformed_reshaped.flatten()
+    uFineFull_transformed = uFineFull_transformed_reshaped.flatten()
     energy_error.append(
-        np.sqrt(np.dot(uCoarseFull - uCoarseFull_transformed, AFine * (uCoarseFull - uCoarseFull_transformed))))
-    exact_problem.append(uCoarseFull)
-    non_transformed_problem.append(uCoarseFullJAJ)
-    transformed_problem.append(uCoarseFull_transformed)
+        np.sqrt(np.dot(uFineFull - uFineFull_transformed, AFine * (uFineFull - uFineFull_transformed))))
+    exact_problem.append(uFineFull)
+    non_transformed_problem.append(uFineFullJAJ)
+    transformed_problem.append(uFineFull_transformed)
 
     '''
     Plot solutions
     '''
-    ymin = np.min(uCoarseFull)
-    ymax = np.max(uCoarseFull)
+    ymin = np.min(uFineFull)
+    ymax = np.max(uFineFull)
 
     fig = plt.figure(str(N))
     fig.subplots_adjust(left=0.01,bottom=0.04,right=0.99,top=0.95,wspace=0,hspace=0.2)
     ax = fig.add_subplot(221, projection='3d')
     ax.set_title('exact',fontsize=16)
-    d3solextra(NFine, uCoarseFull, fig, ax, min, max)
+    d3solextra(NFine, uFineFull, fig, ax, min, max)
     ax = fig.add_subplot(222, projection='3d')
     ax.set_title('non_transformed',fontsize=16)
-    d3solextra(NFine, uCoarseFullJAJ, fig, ax, min, max)
+    d3solextra(NFine, uFineFullJAJ, fig, ax, min, max)
     ax = fig.add_subplot(223, projection='3d')
     ax.set_title('transformed',fontsize=16)
-    d3solextra(NFine, uCoarseFull_transformed, fig, ax, min, max)
+    d3solextra(NFine, uFineFull_transformed, fig, ax, min, max)
     ax = fig.add_subplot(224, projection='3d')
     ax.set_title('absolute error',fontsize=16)
-    d3solextra(NFine, uCoarseFull_transformed-uCoarseFull, fig, ax, min, max)
+    d3solextra(NFine, uFineFull_transformed-uFineFull, fig, ax, min, max)
 
 
 # here, we compare the solutions.
