@@ -9,18 +9,18 @@ import matplotlib.pyplot as plt
 from gridlod import util, world, fem, femsolver
 from gridlod.world import World
 import psi_functions
-from visualization_tools import drawCoefficient, d3plotter, d3solextra, d3sol
+from visualization_tools import drawCoefficient, drawCoefficient_origin, d3plotter, d3solextra, d3sol
 import buildcoef2d
 
-fine = 8
+fine = 16
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 # list of coarse meshes
-NList = [4,8]
+NList = [16]
 
 #perturbation
-alpha = 1./4.
-psi = psi_functions.plateau_2d_on_one_axis(alpha)
+alpha = 3./8.
+psi = psi_functions.plateau_2d_on_one_axis(NFine, alpha)
 
 bg = 0.01 		#background
 val = 1			#values
@@ -28,9 +28,9 @@ val = 1			#values
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg	    	        = bg,
                         val		            = val,
-                        length              = 2,
-                        thick               = 2,
-                        space               = 2,
+                        length              = 4,
+                        thick               = 4,
+                        space               = 4,
                         probfactor          = 1,
                         right               = 1,
                         down                = 0,
@@ -45,46 +45,33 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         ChannelVertical     = None,
                         BoundarySpace       = True)
 
-aFine = CoefClass.BuildCoefficient()
-
-plt.figure("Coefficient")
-drawCoefficient(NFine,aFine)
+aFine = CoefClass.BuildCoefficient() # .flatten()  #  <-- we always want to have flatten form
+aFine_flatten = aFine.flatten()
 
 xpCoarse = util.pCoordinates(NFine)
 xtCoarse = util.tCoordinates(NFine)
 
-a_transformed = np.copy(aFine)
-alpha = 1./4.
+aPert = psi.inverse_transformation(aFine_flatten, xtCoarse)
+aBack = psi.transformation(aPert, xtCoarse)
 
-for k in range(0, np.shape(xtCoarse)[0]):
-    transformed_x = psi.inverse_evaluate(xtCoarse[k])
-    a_transformed[int(xtCoarse[k, 0] * fine), int(xtCoarse[k, 1] * fine)] = aFine[
-        int(transformed_x[0] * fine), int(transformed_x[1] * fine)]
-
-aPert = a_transformed
+plt.figure("Coefficient")
+drawCoefficient_origin(NFine, aFine_flatten)
 
 plt.figure("a_perturbed")
-drawCoefficient(NFine, aPert)
+drawCoefficient_origin(NFine, aPert)
+
+#plt.figure("a_back")
+#drawCoefficient_origin(NFine, aBack)
 
 # jAj is the perturbed reference coefficient
-jAj_reshape = np.tile(np.eye(2), [fine,fine,1,1])
-for k in range(0, np.shape(xtCoarse)[0]):
-    jAj_reshape[int(xtCoarse[k, 0] * fine), int(xtCoarse[k, 1] * fine)] *= aFine[int(xtCoarse[k, 0] * fine), int(xtCoarse[k, 1] * fine)]
+jAj = psi.apply_transformation_to_bilinear_form(aFine_flatten, xtCoarse)
 
-for k in range(0, np.shape(xtCoarse)[0]):
-    Jinv = psi.Jinv(xtCoarse[k])
-    jAj_reshape[int(xtCoarse[k, 0] * fine), int(xtCoarse[k, 1] * fine)] *= psi.detJ(xtCoarse[k]) * Jinv * np.transpose(Jinv)
-
-jAj = jAj_reshape.reshape(fine*fine,2,2)
-#print jAj
 # TODO: Visualization for matrix valued coefficients
 
 f = np.ones(np.prod(NFine+1))
-f_pert = np.copy(f)
-for k in range(0, np.shape(xpCoarse)[0]):
-    f_pert[k] *= psi.detJ(xpCoarse[k])
+f_pert = psi.apply_transformation_to_linear_functional(f, xpCoarse)
 
-d3sol(NFine,f, 'right hand side NT')
+#d3sol(NFine,f, 'right hand side NT')
 d3sol(NFine,f_pert, 'right hand side T')
 
 exact_problem = []
@@ -107,16 +94,8 @@ for N in NList:
     uFineFull, AFine, nothing = femsolver.solveFine(world, aPert.flatten(), f, None, boundaryConditions)
     uFineFullJAJ, jAjFine, nothing = femsolver.solveFine(world, jAj, f_pert, None, boundaryConditions)
 
-    uFineFullJAJ_reshaped = uFineFullJAJ.reshape(NFine+1)
-    uFineFull_transformed_reshaped = np.copy(uFineFullJAJ_reshaped)
+    uFineFull_transformed = psi.inverse_transformation(uFineFullJAJ, xpCoarse)
 
-
-    for k in range(0, np.shape(xpCoarse)[0]):
-        transformed_x = psi.inverse_evaluate(xpCoarse[k])
-        uFineFull_transformed_reshaped[int(xpCoarse[k, 0] * fine), int(xpCoarse[k, 1] * fine)] = uFineFullJAJ_reshaped[
-            int(transformed_x[0] * fine), int(transformed_x[1] * fine)]
-
-    uFineFull_transformed = uFineFull_transformed_reshaped.flatten()
     energy_error.append(
         np.sqrt(np.dot(uFineFull - uFineFull_transformed, AFine * (uFineFull - uFineFull_transformed))))
     exact_problem.append(uFineFull)
