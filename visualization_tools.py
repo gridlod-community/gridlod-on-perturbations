@@ -13,6 +13,21 @@ from matplotlib import cm
 from gridlod import util
 
 
+def drawCoefficient_origin(N, a):
+    # This is drawCoefficient from test_pgtransport.py in gridlod
+    aCube = np.log10(a.reshape(N, order='F'))
+    aCube = np.ascontiguousarray(aCube.T)
+    plt.clf()
+
+    cmap = plt.cm.viridis
+
+    plt.imshow(aCube,
+               origin='lower',
+               interpolation='none',
+               cmap=cmap)
+    plt.colorbar()
+
+
 def drawCoefficient(N, a, greys=False, normalize=None):
     '''
     visualizing the 2d coefficient
