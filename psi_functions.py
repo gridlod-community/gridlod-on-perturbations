@@ -5,22 +5,13 @@
 
 import numpy as np
 
-def find_correct_index_2d(x, xtCoarse):
-    # NOTE: This is extremely slow !!!
-    epsilon = xtCoarse[1][0] - xtCoarse[0][0]
-    for i in range(np.shape(xtCoarse)[0]):
-        if xtCoarse[i][0] - epsilon/2 < x[0] <= xtCoarse[i][0] + epsilon/2:
-            if xtCoarse[i][1] - epsilon/2 < x[1] <= xtCoarse[i][1] + epsilon/2:
-                index = i
-                init = 1
-    return index
-
 class smooth_1d:
     # the perturbation is defined as
     # y = psi(x) = x + alpha * (1-x)x
     def __init__(self, NFine, alpha):
         self.NFine = NFine
         self.alpha = alpha
+        self.d = 1
 
     def inverse_evaluate(self, x):
         alpha = self.alpha
@@ -81,6 +72,7 @@ class plateau_1d:
 
     def __init__(self, alpha):
         self.alpha = alpha
+        self.d = 1
 
     def inverse_evaluate(self, x):
         alpha = self.alpha
@@ -125,72 +117,65 @@ class plateau_2d_on_one_axis:
     def __init__(self, NFine, alpha):
         self.alpha = alpha
         self.NFine = NFine
+        self.d = 2
 
     def inverse_evaluate(self, x):
         alpha = self.alpha
         ret = np.copy(x)
-        if np.size(x) == 2:
-            if (x[0] < 1. / 4. + alpha / 2):
-                ret[0] = x[0] * (1 / (1 + 2 * alpha))
-            if ((1. / 4. + alpha / 2 <= x[0]) & (x[0] <= 3 / 4. + alpha / 2)):
-                ret[0] = x[0] - alpha / 2.
-            if (x[0] > 3 / 4. + alpha / 2):
-                ret[0] = (x[0] - alpha * 2.) / (1 - 2. * alpha)
-            ret[1] = x[1]
-        else:
-            for i in range(np.shape(x)[0]):
-                if (x[i][0] < 1. / 4. + alpha / 2):
-                    ret[i][0] = x[i][0] * (1 / (1 + 2 * alpha))
-                if ((1. / 4. + alpha / 2 <= x[i][0]) & (x[i][0] <= 3 / 4. + alpha / 2)):
-                    ret[i][0] = x[i][0] - alpha / 2.
-                if (x[i][0] > 3 / 4. + alpha / 2):
-                    ret[i][0] = (x[i][0] - alpha * 2.) / (1 - 2. * alpha)
-                ret[i][1] = x[i][1]
-        return ret
 
+        # Case 1
+        c1 = x[...,0] < 1./4. + alpha/2.
+        ret[c1,0] = x[c1,0] * (1 / (1 + 2 * alpha))
+
+        # Case 2
+        c2 = np.logical_and(1./4. + alpha/2. <= x[...,0], x[...,0] <= 3./4. + alpha/2.)
+        ret[c2,0] = x[c2,0] - alpha/2.
+
+        # Case 3
+        c3 = x[...,0] > 3./4. + alpha/2.
+        ret[c3,0] = (x[c3,0] - alpha*2.)/(1. - 2.*alpha)
+        
+        ret[...,1] = ret[...,1]
+
+        return ret
+    
     def evaluate(self, x):
         alpha = self.alpha
         ret = np.copy(x)
-        if np.size(x) == 2:
-            if (x[0] < 1. / 4.):
-                ret[0] = x[0] + alpha * 2 * x[0]
-            if ((1. / 4. <= x[0]) & (x[0] <= 3 / 4.)):
-                ret[0] = x[0] + alpha / 2
-            if (x[0] > 3 / 4.):
-                ret[0] = x[0] + alpha * (2. - 2. * x[0])
-            ret[1] = x[1]
-        else:
-            for i in range(np.shape(x)[0]):
-                if (x[i][0] < 1. / 4.):
-                    ret[i][0] = x[i][0] + alpha * 2 * x[i][0]
-                if ((1. / 4. <= x[i][0]) & (x[i][0] <= 3 / 4.)):
-                    ret[i][0] = x[i][0] + alpha / 2
-                if (x[i][0] > 3 / 4.):
-                    ret[i][0] = x[i][0] + alpha * (2. - 2. * x[i][0])
-                ret[i][1] = x[i][1]
+
+        # Case 1
+        c1 = x[...,0] < 1./4.
+        ret[c1,0] = x[c1,0] + alpha*2*x[c1,0]
+        
+        # Case 2
+        c2 = np.logical_and(1./4. <= x[...,0], x[...,0] <= 3./4.)
+        ret[c2,0] = x[c2,0] + alpha/2
+        
+        # Case 3
+        c3 = x[...,0] > 3./4.
+        ret[c3,0] = x[c3,0] + alpha*(2.-2.*x[c3,0])
+
+        ret[...,1] = x[...,1]
+        
         return ret
 
     def J(self, x):
         alpha = self.alpha
-        if (np.size(x) == 2):
-            ret = np.eye(2)
-            if (x[0] < 1. / 4.):
-                ret[0, 0] = (1. + 2 * alpha)
-            if ((1. / 4. <= x[0]) & (x[0] <= 3 / 4.)):
-                ret[0, 0] = 1.
-            if (x[0] > 3 / 4.):
-                ret[0, 0] = (1. - 2 * alpha)
-            ret[1, 1] = 1
-        else:
-            ret = np.tile(np.eye(2), [np.shape(x)[0], 1, 1])
-            for i in range(np.shape(x)[0]):
-                if (x[i][0] < 1. / 4.):
-                    ret[i,0,0] = (1. + 2 * alpha)
-                if ((1. / 4. <= x[i][0]) & (x[i][0] <= 3 / 4.)):
-                    ret[i,0,0] = 1.
-                if (x[i][0] > 3 / 4.):
-                    ret[i,0,0] = (1. - 2 * alpha)
-            ret[i,1,1] = 1
+
+        ret = np.tile(np.eye(2), [x.shape[0], 1, 1])
+        
+        # Case 1
+        c1 = x[...,0] < 1./4.
+        ret[c1,0,0] = (1. + 2 * alpha)
+        
+        # Case 2
+        c2 = np.logical_and(1./4. <= x[...,0], x[...,0] <= 3./4.)
+        ret[c2,0,0] = 1.
+        
+        # Case 3
+        c3 = x[...,0] > 3./4.
+        ret[c3,0,0] = (1. - 2 * alpha)
+
         return ret
 
     def Jinv(self, x):
@@ -200,38 +185,3 @@ class plateau_2d_on_one_axis:
     def detJ(self, x):
         J = self.J(x)
         return np.linalg.det(J)
-
-    def transformation(self, function, x_values):
-        assert(np.size(function) == np.shape(x_values)[0])
-        x_transformed = self.evaluate(x_values)
-        new_function = np.copy(function)
-        for i in range(np.shape(x_values)[0]):
-            index = find_correct_index_2d(x_transformed[i], x_values)
-            new_function[i] = function[index]
-        return new_function
-
-    def inverse_transformation(self, function, x_values):
-        assert(np.size(function) == np.shape(x_values)[0])
-        x_transformed = self.inverse_evaluate(x_values)
-        new_function = np.copy(function)
-        for i in range(np.shape(x_values)[0]):
-            index = find_correct_index_2d(x_transformed[i], x_values)
-            new_function[i] = function[index]
-        return new_function
-
-    def apply_transformation_to_bilinear_form(self, aFine_in, x_values):
-        assert (np.size(aFine_in) == np.shape(x_values)[0])
-        aFine_out = np.tile(np.eye(2), [self.NFine[0]*self.NFine[1],1,1])
-        Jinv = self.Jinv(x_values)
-        detJ = self.detJ(x_values)
-        for i in range(np.shape(x_values)[0]):
-            aFine_out[i] *= detJ[i] * Jinv[i] * np.transpose(Jinv[i]) * aFine_in[i]
-        return aFine_out
-
-    def apply_transformation_to_linear_functional(self, f_in, x_values):
-        assert (np.size(f_in) == np.shape(x_values)[0])
-        f_out = np.copy(f_in)
-        detJ = self.detJ(x_values)
-        for i in range(np.shape(x_values)[0]):
-            f_out[i] = detJ[i]
-        return f_out
