@@ -41,13 +41,13 @@ class MappingCQ1:
         self.d = N.size
 
     def evaluate(self, x):
-        return func.evaluateCQ1(self.N, mapping, x)
+        return func.evaluateCQ1(self.N, self.mapping, x)
 
     def inverse_evaluate(self, x):
-        return func.evaluateCQ1(self.N, inv_mapping, x)
+        return func.evaluateCQ1(self.N, self.inv_mapping, x)
 
     def J(self, x):
-        return func.evaluateCQ1D(self.N, mapping, x)
+        return func.evaluateCQ1D(self.N, self.mapping, x)
     
     def Jinv(self, x):
         return np.linalg.inv(self.J(x))
