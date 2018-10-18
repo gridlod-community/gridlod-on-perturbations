@@ -1,6 +1,6 @@
 # This file is part of the master thesis "Variational crimes in the Localized orthogonal decomposition method":
 #   https://github.com/TiKeil/Masterthesis-LOD.git
-# Copyright holder: Tim Keil
+# Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
 import numpy as np
