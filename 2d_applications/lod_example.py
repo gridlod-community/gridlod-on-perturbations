@@ -22,21 +22,43 @@ NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 # list of coarse meshes
 N = 16
-
-#perturbation
-alpha = 1./48.
+Np = 15
+Nmapping = np.array([Np,Np])
 
 xpFine = util.pCoordinates(NFine)
 xtFine = util.tCoordinates(NFine)
 
-# Explicit psi
-#psi = psi_functions.general_plateau_2d_on_one_axis(NFine, alpha, 22./48., 26./48., 30./48., 34./48.)
-#psi = psi_functions.general_plateau_2d_on_one_axis(NFine, alpha, 0, 1./4., 3./4., 1)
+# cq1 = np.array([0, 0.5, 0.5, 0,
+#                 0, 0.5, 0.5, 0,
+#                 0, 0.5, 0.5, 0,
+#                 0, 0.5, 0.5, 0])
+#
+# cq1 = np.array([0, 0, 0.5, 0.5, 0, 0,
+#                 0, 0, 0.5, 0.5, 0, 0,
+#                 0, 0, 0.5, 0.5, 0, 0,
+#                 0, 0, 0.5, 0.5, 0, 0,
+#                 0, 0, 0.5, 0.5, 0, 0,
+#                 0, 0, 0.5, 0.5, 0, 0])
+
+cq1 = np.zeros((Np+1,Np+1))
+cq1[:,int(np.round(Np/2.+0.8)-1)] = 0.5
+cq1[:,int(np.round(Np/2.+0.8))] = 0.5
+cq1 = cq1.flatten()
+
+alpha = 1./8.
+
+for_mapping = np.stack((xpFine[:,0] + alpha * func.evaluateCQ1(Nmapping, cq1, xpFine), xpFine[:,1]), axis = 1)
+psi = discrete_mapping.MappingCQ1(NFine, for_mapping)
+
+# psi_h1 = xpFine[:,0] + (1 - xpFine[:,0]) * 0.1 *xpFine[:,0]
+# psi_h2 = xpFine[:,1]
+# psi_h = np.stack((psi_h1, psi_h2), axis = 1)
+# psi = discrete_mapping.MappingCQ1(NFine, psi_h)
 
 # Discrete mapping
-e = np.exp(1)
-mapping = (np.exp(xpFine)-1)/(e-1)
-psi = discrete_mapping.MappingCQ1(NFine, mapping)
+# e = np.exp(1)
+# mapping = (np.exp(xpFine)-1)/(e-1)
+# psi = discrete_mapping.MappingCQ1(NFine, mapping)
 
 # Compute grid points and mapped grid points
 # Grid naming:
@@ -54,11 +76,11 @@ val = 1			#values
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg                  = bg,
                         val                 = val,
-                        length              = 1,
+                        length              = 20,
                         thick               = 4,
-                        space               = 50,
+                        space               = 64,
                         probfactor          = 1,
-                        right               = 0,
+                        right               = 1,
                         down                = 0,
                         diagr1              = 0,
                         diagr2              = 0,
@@ -161,7 +183,8 @@ ax.imshow(np.reshape(uFineFull_trans_pert, NFine+1), origin='lower_left')
 ax = fig.add_subplot(224)
 ax.set_title('Absolute error between perturbed and remapped transformed',fontsize=6)
 #d3solextra(NFine, uFineFull_trans_pert-uFineFull_pert, fig, ax, min, max)
-ax.imshow(np.reshape(uFineFull_trans_pert - uFineFull_pert, NFine+1), origin='lower_left')
+im = ax.imshow(np.reshape(uFineFull_trans_pert - uFineFull_pert, NFine+1), origin='lower_left')
+fig.colorbar(im, ax = ax)
 
 # here, we compare the solutions.
 # todo: we need a better error comparison !! This is not looking good at all.
