@@ -7,8 +7,9 @@ from __future__ import print_function
 
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.sparse as sparse
 
-from gridlod import util, world, fem, femsolver, func
+from gridlod import util, world, fem, femsolver, func, interp, pg, coef
 from gridlod.world import World
 
 import psi_functions
@@ -16,7 +17,8 @@ import discrete_mapping
 from visualization_tools import drawCoefficient, drawCoefficient_origin, d3plotter, d3solextra, d3sol
 import buildcoef2d
 
-fine = 512
+
+fine = 128
 NFine = np.array([fine,fine])
 #NCoeff = np.array([32,32])
 NpFine = np.prod(NFine + 1)
@@ -56,9 +58,9 @@ psi = discrete_mapping.MappingCQ1(NFine, for_mapping)
 # psi = discrete_mapping.MappingCQ1(NFine, psi_h)
 
 # Discrete mapping
-# e = np.exp(1)
-# mapping = (np.exp(xpFine)-1)/(e-1)
-# psi = discrete_mapping.MappingCQ1(NFine, mapping)
+e = np.exp(1)
+mapping = (np.exp(xpFine)-1)/(e-1)
+#psi = discrete_mapping.MappingCQ1(NFine, mapping)
 
 # Compute grid points and mapped grid points
 # Grid naming:
@@ -76,9 +78,9 @@ val = 1			#values
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg                  = bg,
                         val                 = val,
-                        length              = 20,
-                        thick               = 4,
-                        space               = 64,
+                        length              = 1,
+                        thick               = 1,
+                        space               = 16,
                         probfactor          = 1,
                         right               = 1,
                         down                = 0,
@@ -142,18 +144,28 @@ world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 #               but then remapped to the perturbed domain
 uFineFull_pert, AFine_pert, _ = femsolver.solveFine(world, aFine_pert, f_pert, None, boundaryConditions)
 uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_trans, None, boundaryConditions)
+uFineFull_trans_ref, AFine_trans_ref, _ = femsolver.solveFine(world, aFine_ref, f_trans, None, boundaryConditions)
+uFineFull_ref, AFine_ref, _ = femsolver.solveFine(world, aFine_ref, f_ref, None, boundaryConditions)
 
 uFineFull_trans_pert = func.evaluateCQ1(NFine, uFineFull_trans, xpFine_ref)
+uFineFull_trans_pert_ref = func.evaluateCQ1(NFine, uFineFull_trans_ref, xpFine_ref)
+uFineFull_ref_pert = func.evaluateCQ1(NFine, uFineFull_ref, xpFine_ref)
 
+#exact transformation
 energy_norm = np.sqrt(np.dot(uFineFull_pert, AFine_pert * uFineFull_pert))
 energy_error = np.sqrt(np.dot((uFineFull_trans_pert - uFineFull_pert), AFine_pert * (uFineFull_trans_pert - uFineFull_pert)))
 print("Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error, energy_error/energy_norm))
 
-# energy_error.append(
-#     np.sqrt(np.dot(uFineFull - uFineFull_transformed, AFine * (uFineFull - uFineFull_transformed))))
-# exact_problem.append(uFineFull)
-# non_transformed_problem.append(uFineFullJAJ)
-# transformed_problem.append(uFineFull_transformed)
+#reference transformation with transformed f
+energy_norm = np.sqrt(np.dot(uFineFull_pert, AFine_pert * uFineFull_pert))
+energy_error = np.sqrt(np.dot((uFineFull_trans_pert_ref - uFineFull_pert), AFine_pert * (uFineFull_trans_pert_ref - uFineFull_pert)))
+print("Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error, energy_error/energy_norm))
+
+#pure reference transformation
+energy_norm = np.sqrt(np.dot(uFineFull_pert, AFine_pert * uFineFull_pert))
+energy_error = np.sqrt(np.dot((uFineFull_ref_pert - uFineFull_pert), AFine_pert * (uFineFull_ref_pert - uFineFull_pert)))
+print("Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error, energy_error/energy_norm))
+
 
 '''
 Plot solutions
@@ -194,3 +206,33 @@ fig.colorbar(im, ax = ax)
 
 
 plt.show()
+
+# PGLOD
+IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
+a_ref_coef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aFine_ref)
+a_trans_coef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aFine_trans)
+
+pglod = pg.PetrovGalerkinLOD(world, 2, IPatchGenerator, 0, 3)
+pglod.updateCorrectors(a_ref_coef,clearFineQuantities=False)
+pglod.updateCorrectors(a_trans_coef,clearFineQuantities=False)
+
+KFull = pglod.assembleMsStiffnessMatrix()
+MFull = fem.assemblePatchMatrix(NWorldCoarse, world.MLocCoarse)
+free = util.interiorpIndexMap(NWorldCoarse)
+
+bFull = MFull * f_trans
+KFree = KFull[free][:, free]
+bFree = bFull[free]
+
+xFree = sparse.linalg.spsolve(KFree, bFree)
+basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
+
+basisCorrectors = pglod.assembleBasisCorrectors()
+
+modifiedBasis = basis - basisCorrectors
+
+NpCoarse = np.prod(NWorldCoarse+1)
+xFull = np.zeros(NpCoarse)
+xFull[free] = xFree
+uCoarse = xFull
+uLodFine = modifiedBasis * xFull
