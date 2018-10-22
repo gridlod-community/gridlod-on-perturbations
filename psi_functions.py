@@ -1,6 +1,6 @@
 # This file is part of the project for "Localization of multiscale problems with random defects":
 #   https://github.com/gridlod-community/gridlod-on-perturbations.git
-# Copyright holder: Tim Keil
+# Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
 import numpy as np
