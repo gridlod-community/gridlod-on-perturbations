@@ -207,32 +207,33 @@ fig.colorbar(im, ax = ax)
 
 plt.show()
 
-# PGLOD
-IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
-a_ref_coef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aFine_ref)
-a_trans_coef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aFine_trans)
+# PGLOD this is currently failing (see todo note)
 
-pglod = pg.PetrovGalerkinLOD(world, 2, IPatchGenerator, 0, 3)
-pglod.updateCorrectors(a_ref_coef,clearFineQuantities=False)
-pglod.updateCorrectors(a_trans_coef,clearFineQuantities=False)
-
-KFull = pglod.assembleMsStiffnessMatrix()
-MFull = fem.assemblePatchMatrix(NWorldCoarse, world.MLocCoarse)
-free = util.interiorpIndexMap(NWorldCoarse)
-
-bFull = MFull * f_trans
-KFree = KFull[free][:, free]
-bFree = bFull[free]
-
-xFree = sparse.linalg.spsolve(KFree, bFree)
-basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
-
-basisCorrectors = pglod.assembleBasisCorrectors()
-
-modifiedBasis = basis - basisCorrectors
-
-NpCoarse = np.prod(NWorldCoarse+1)
-xFull = np.zeros(NpCoarse)
-xFull[free] = xFree
-uCoarse = xFull
-uLodFine = modifiedBasis * xFull
+# IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
+# a_ref_coef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aFine_ref)
+# a_trans_coef = coef.coefficientFine(NWorldCoarse, NCoarseElement, aFine_trans)
+#
+# pglod = pg.PetrovGalerkinLOD(world, 2, IPatchGenerator, 0, 3)
+# pglod.updateCorrectors(a_ref_coef,clearFineQuantities=False)
+# pglod.updateCorrectors(a_trans_coef,clearFineQuantities=False)   #todo: this required error indicator with matrix valued A
+#
+# KFull = pglod.assembleMsStiffnessMatrix()
+# MFull = fem.assemblePatchMatrix(NWorldCoarse, world.MLocCoarse)
+# free = util.interiorpIndexMap(NWorldCoarse)
+#
+# bFull = MFull * f_trans
+# KFree = KFull[free][:, free]
+# bFree = bFull[free]
+#
+# xFree = sparse.linalg.spsolve(KFree, bFree)
+# basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
+#
+# basisCorrectors = pglod.assembleBasisCorrectors()
+#
+# modifiedBasis = basis - basisCorrectors
+#
+# NpCoarse = np.prod(NWorldCoarse+1)
+# xFull = np.zeros(NpCoarse)
+# xFull[free] = xFree
+# uCoarse = xFull
+# uLodFine = modifiedBasis * xFull
