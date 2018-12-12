@@ -19,7 +19,7 @@ def drawCoefficient_origin(N, a):
     aCube = np.ascontiguousarray(aCube.T)
     plt.clf()
 
-    cmap = plt.cm.viridis
+    cmap = plt.cm.plasma
 
     plt.imshow(aCube,
                origin='lower',
