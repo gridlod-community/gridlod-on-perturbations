@@ -3,7 +3,7 @@
 # Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
-from __future__ import print_function
+
 
 import numpy as np
 import matplotlib.pyplot as plt

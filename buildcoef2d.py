@@ -3,7 +3,6 @@
 # Copyright holder: Tim Keil 
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
-# TODO: This class needs a clean up !
 
 import numpy as np
 import random
@@ -335,7 +334,7 @@ class Coefficient2d:
                 #can we do something here?
                 if A[i][j] == 0:
                     #will we do something here?
-                    A[i][j] = random.sample(valorbg,1)[0]
+                    A[i][j] = random.sample(list(valorbg),1)[0]
                     if equidistant:
                         A[i][j] = 1 #yes sure
                     #if yes then
@@ -358,7 +357,7 @@ class Coefficient2d:
                             for s in range(0,self.Shapes):
                                 #IMMPORTANT
                                 zuf.append(s+7)
-                            zuf = list(filter(lambda x: x!=0 ,zuf))
+                            zuf = list([x for x in zuf if x!=0])
                     
                         zuf1 = random.sample(zuf,1)[0] #chooses shape
                         '''
@@ -1138,16 +1137,16 @@ class Coefficient2d:
                         thick = int(S[shapecounter][2])
                     
                         ratiocur = random.sample(ratioList,1)[0]
-                        decide = random.sample(decision,1)[0]
+                        decide = random.sample(list(decision),1)[0]
                         
-                        NumberList = filter(lambda x: x == shapecounter,Number)
+                        NumberList = [x for x in Number if x == shapecounter]
                         if np.size(NumberList) == 1:
                             decide = 1
                         else:
                             decide = 0
                         
                         
-                        NumberList = filter(lambda x: x == shapecounter,Number)
+                        NumberList = [x for x in Number if x == shapecounter]
                         if np.size(NumberList) == 1:
                             move = 1
                         else:
@@ -1459,7 +1458,7 @@ class Coefficient2d:
                 if A[i][j]!=bg and A[i][j]!=0:
                     shapecounter += 1
                     
-                    NumberList = filter(lambda x: x == shapecounter,Number)
+                    NumberList = [x for x in Number if x == shapecounter]
                     
                     if NumberList is not []:
                         #find the right shape
@@ -1474,9 +1473,9 @@ class Coefficient2d:
                         Len = int(S[shapecounter][1])
                         thick = int(S[shapecounter][2])
                     
-                        vanish = random.sample(decision,1)[0]
+                        vanish = random.sample(list(decision),1)[0]
                     
-                        NumberList = filter(lambda x: x == shapecounter,Number)
+                        NumberList = [x for x in Number if x == shapecounter]
                         if np.size(NumberList) == 1:
                             vanish = bg
                         else:
@@ -1571,7 +1570,7 @@ class Coefficient2d:
             stepList = randomstep
         
         MoveList = [Right*1,BottomRight*2,Bottom*3,BottomLeft*4,Left*5,TopLeft*6,Top*7,TopRight*8]
-        MoveList = list(filter(lambda x: x!=0 ,MoveList))
+        MoveList = list([x for x in MoveList if x!=0])
         
         #for remember
         shapecounter = -1
@@ -1949,7 +1948,7 @@ class Coefficient2d:
         MoveList = [Right*1,BottomRight*2,Bottom*3,BottomLeft*4,Left*5,TopLeft*6,Top*7,TopRight*8]
         if AllDirections:
             MoveList = [r for r in range(1,9)]
-        MoveList = list(filter(lambda x: x!=0 ,MoveList))
+        MoveList = list([x for x in MoveList if x!=0])
         
         #for remember
         shapecounter = -1
@@ -1983,11 +1982,11 @@ class Coefficient2d:
                     Len = int(S[shapecounter][1])
                     thick = int(S[shapecounter][2])
             
-                    move = random.sample(decision,1)[0]
+                    move = random.sample(list(decision),1)[0]
                     step = random.sample(stepList,1)[0]
                     direction = random.sample(MoveList,1)[0]
                     
-                    NumberList = filter(lambda x: x == shapecounter,Number)
+                    NumberList = [x for x in Number if x == shapecounter]
                     if np.size(NumberList) == 1:
                         move = 1
                     else:
@@ -2092,7 +2091,7 @@ class Coefficient2d:
         
         
         DirectionListori = [LU*1,RU*2,LO*3,RO*4]
-        DirectionListori = list(filter(lambda x: x!=0 ,DirectionListori))
+        DirectionListori = list([x for x in DirectionListori if x!=0])
         
         for i in range(0,NWorldFine[0]):
             for j in range(0,NWorldFine[1]):
@@ -2199,20 +2198,20 @@ class Coefficient2d:
                             break                    
                     
                     if spacelreal != spacelo:
-                        DirectionList = list(filter(lambda x: x!=1 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=1])
                     
                     if spacelreal != spacelu:
-                        DirectionList = list(filter(lambda x: x!=3 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=3])
                     
                     if spacerreal != spacero:
-                        DirectionList = list(filter(lambda x: x!=2,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=2])
                     if spacerreal != spaceru:
-                        DirectionList = list(filter(lambda x: x!=4,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=4])
                     
                     if spacelo ==0 or spacelu == 0:
-                        DirectionList = list(filter(lambda x: x!=1 and x!=3 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=1 and x!=3])
                     if spacero ==0 or spaceru == 0:
-                        DirectionList = list(filter(lambda x: x!=2 and x!=4 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=2 and x!=4])
                          
                     matu = 0
                     for k in range(1,NWorldFine[0]):
@@ -2235,16 +2234,16 @@ class Coefficient2d:
                             break
                     
                     if mato < spacelo or matu+1 < thick:
-                        DirectionList = list(filter(lambda x: x!=3 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=3])
                     
                     if mato < spacero or matu+1 < thick:
-                        DirectionList = list(filter(lambda x: x!=4 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=4])
                     
                     if matu < spacelu or mato+1 < thick:
-                        DirectionList = list(filter(lambda x: x!=1 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=1])
                     
                     if matu < spaceru or mato+1 < thick:
-                        DirectionList = list(filter(lambda x: x!=2 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=2])
                     
                     if np.size(DirectionList) != 0:
                         direction = random.sample(DirectionList,1)[0]
@@ -2331,7 +2330,7 @@ class Coefficient2d:
         
         
         DirectionListori = [LU*1,RU*2,LO*3,RO*4]
-        DirectionListori = list(filter(lambda x: x!=0 ,DirectionListori))
+        DirectionListori = list([x for x in DirectionListori if x!=0])
         
         for i in range(0,NWorldFine[0]):
             for j in range(0,NWorldFine[1]):
@@ -2438,24 +2437,24 @@ class Coefficient2d:
                             break                    
                     
                     if spacelreal != spacelo:
-                        DirectionList = list(filter(lambda x: x!=1 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=1])
                     
                     if spacelreal != spacelu:
-                        DirectionList = list(filter(lambda x: x!=3 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=3])
                     
                     #print DirectionList
                     
                     if spacerreal != spacero:
-                        DirectionList = list(filter(lambda x: x!=2,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=2])
                     if spacerreal != spaceru:
-                        DirectionList = list(filter(lambda x: x!=4,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=4])
                     
                     #print DirectionList
                     
                     if spacelo ==0 or spacelu == 0:
-                        DirectionList = list(filter(lambda x: x!=1 and x!=3 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=1 and x!=3])
                     if spacero ==0 or spaceru == 0:
-                        DirectionList = list(filter(lambda x: x!=2 and x!=4 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=2 and x!=4])
                          
                     #print DirectionList
                     matu = 0
@@ -2479,16 +2478,16 @@ class Coefficient2d:
                             break
                     
                     if mato < spacelo or matu < thick:
-                        DirectionList = list(filter(lambda x: x!=3 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=3])
                     
                     if mato < spacero or matu < thick:
-                        DirectionList = list(filter(lambda x: x!=4 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=4])
                     
                     if matu < spacelu or mato < thick:
-                        DirectionList = list(filter(lambda x: x!=1 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=1])
                     
                     if matu < spaceru or mato < thick:
-                        DirectionList = list(filter(lambda x: x!=2 ,DirectionList))
+                        DirectionList = list([x for x in DirectionList if x!=2])
                     
                     if np.size(DirectionList) != 0:
                         direction = random.sample(DirectionList,1)[0]
@@ -2557,7 +2556,7 @@ class Coefficient2d:
             for j in range(0,NWorldFine[1]):
                 if A[i][j] == 1:
                     valuecounter += 1
-                    NumberList = filter(lambda x: x == valuecounter,Number)
+                    NumberList = [x for x in Number if x == valuecounter]
                     if np.size(NumberList) == 1:
                         if Vanish:
                             A[i][j] = bg
