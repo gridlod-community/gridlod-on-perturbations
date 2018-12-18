@@ -76,7 +76,7 @@ for N in NList:
     NWorldCoarse = np.array([N])
     boundaryConditions = np.array([[0, 0]])
 
-    NCoarseElement = NFine / NWorldCoarse
+    NCoarseElement = NFine // NWorldCoarse
     world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 
     # grid nodes

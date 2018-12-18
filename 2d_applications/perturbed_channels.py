@@ -61,7 +61,7 @@ Nmapping = np.array([int(fine),int(fine)])
 cq1 = np.zeros((int(fine)+1,int(fine)+1))
 
 size_of_an_element = 1./128.
-print(round(space/2 - thick/2 -0.9))
+print(round(space//2 - thick//2 -0.9))
 walk_with_perturbation =  round(space/2 - thick/2 - 0.9) * size_of_an_element
 number_of_channels = len(CoefClass.ShapeRemember)
 
@@ -71,8 +71,8 @@ channels_end_from_zero = channels_position_from_zero + thick
 for i in range(number_of_channels):
 #for i in [0]:
     position = channels_position_from_zero * (i+1) + i * thick
-    left = position-space/2 + 3
-    right = position+thick + space/2-3
+    left = position-space//2 + 3
+    right = position+thick + space//2-3
     print(left, position, right)
     if i%2 == 0:
         cq1[:, left:right] = walk_with_perturbation
