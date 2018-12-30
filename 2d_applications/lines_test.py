@@ -3,7 +3,7 @@
 # Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
-from __future__ import print_function
+
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -134,7 +134,7 @@ d3sol(NFine, f_trans, 'right hand side T')
 NWorldCoarse = np.array([N, N])
 boundaryConditions = np.array([[0, 0],[0, 0]])
 
-NCoarseElement = NFine / NWorldCoarse
+NCoarseElement = NFine // NWorldCoarse
 world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 
 # Naming of solutions

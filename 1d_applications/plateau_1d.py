@@ -102,7 +102,7 @@ for N in NList:
     NWorldCoarse = np.array([N])
     boundaryConditions = np.array([[0, 0]])
 
-    NCoarseElement = NFine / NWorldCoarse
+    NCoarseElement = NFine // NWorldCoarse
     world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
     AFine = fem.assemblePatchMatrix(NFine, world.ALocFine, aPert)
     jAjFine = fem.assemblePatchMatrix(NFine, world.ALocFine, jAj)
@@ -147,7 +147,7 @@ plt.figure('FEM-Solutions', figsize=(16, 9))
 plt.subplots_adjust(left=0.01, bottom=0.04, right=0.99, top=0.95, wspace=0.1, hspace=0.2)
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
-for i in xrange(len(NList)):
+for i in range(len(NList)):
     plt.subplot(2,4,i+1)
     plt.plot(x[i], exact_problem[i], '--', label='EX')
     plt.plot(x[i], non_transformed_problem[i], '--', label='NT')

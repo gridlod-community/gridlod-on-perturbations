@@ -3,7 +3,7 @@
 # Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
-from __future__ import print_function
+
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -72,16 +72,16 @@ cq1 = np.zeros((int(fine)+1,int(fine)+1))
 
 for i in range(0,10,2):
     position = dots_position_from_zero * (i+1) + i * thick + int(round(thick/2. - 0.9))
-    left = position-space/2 + 1 - space - thick
-    right = position+thick + space/2 - 1 + space + thick
+    left = position-space//2 + 1 - space - thick
+    right = position+thick + space//2 - 1 + space + thick
     step = np.random.random_integers(0,steps,1)
     sign = (-1)**np.random.random_integers(0,1,1)
     print(step * sign)
     #now the y axis is also random
     j = int(np.random.random_integers(2,number_of_dots_in_one_dimension-2,1))
     position_y = dots_position_from_zero * (j + 1) + j * thick + int(round(thick / 2. - 0.9))
-    left_y = position_y-space/2 + 1 - space - thick
-    right_y = position_y+thick + space/2 - 1 + space + thick
+    left_y = position_y-space//2 + 1 - space - thick
+    right_y = position_y+thick + space//2 - 1 + space + thick
     cq1[left_y:right_y, left:right] = step * sign * size_of_an_element
 
 cq1 = cq1.flatten()
@@ -90,16 +90,16 @@ cq2 = np.zeros((int(fine)+1,int(fine)+1))
 
 for i in range(0,10,2):
     position = dots_position_from_zero * (i+1) + i * thick + int(round(thick/2. - 0.9))
-    left = position-space/2 + 1 - space - thick
-    right = position+thick + space/2 - 1 + space + thick
+    left = position-space//2 + 1 - space - thick
+    right = position+thick + space//2 - 1 + space + thick
     step = np.random.random_integers(0,steps,1)
     sign = (-1)**np.random.random_integers(0,1,1)
     print(step * sign)
     #now the y axis is also random
     j = int(np.random.random_integers(2,number_of_dots_in_one_dimension-2,1))
     position_y = dots_position_from_zero * (j + 1) + j * thick + int(round(thick / 2. - 0.9))
-    left_y = position_y-space/2 + 1 - space - thick
-    right_y = position_y+thick + space/2 - 1 + space + thick
+    left_y = position_y-space//2 + 1 - space - thick
+    right_y = position_y+thick + space//2 - 1 + space + thick
     cq2[left_y:right_y, left:right] = step * sign * size_of_an_element
 
 cq2 = cq2.flatten()

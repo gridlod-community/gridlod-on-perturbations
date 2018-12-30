@@ -3,7 +3,7 @@
 # Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
-from __future__ import print_function
+
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -72,8 +72,8 @@ np.random.seed(1)
 
 for i in range(number_of_channels):
     position = channels_position_from_zero * (i+1) + i * thick + int(round(thick/2. - 0.9))
-    left = position-space/2 + 2
-    right = position+thick + space/2 - 2
+    left = position-space//2 + 2
+    right = position+thick + space//2 - 2
     step = np.random.random_integers(0,steps,1)
     sign = (-1)**np.random.random_integers(0,1,1)
     print(step * sign)
