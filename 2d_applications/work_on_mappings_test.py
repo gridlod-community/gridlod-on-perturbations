@@ -4,16 +4,14 @@
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
 
-
 import numpy as np
 import matplotlib.pyplot as plt
 
 from gridlod import util, world, fem, femsolver, func
 from gridlod.world import World
 
-import psi_functions
 import discrete_mapping
-from visualization_tools import drawCoefficient, drawCoefficient_origin, d3plotter, d3solextra, d3sol
+from visualization_tools import drawCoefficient_origin, d3sol
 import buildcoef2d
 
 fine = 512

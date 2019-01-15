@@ -1,8 +1,6 @@
 import unittest
 import numpy as np
-from gridlod import util, func
-
-import matplotlib.pyplot as plt
+from gridlod import util
 
 import discrete_mapping
 

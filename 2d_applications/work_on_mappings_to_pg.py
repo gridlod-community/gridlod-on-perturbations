@@ -3,26 +3,22 @@
 # Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 
-from gridlod import util, world, fem, femsolver, func, pg, interp, coef
+from gridlod import util, femsolver, func, interp, coef
 from gridlod.world import World
 
-import pg_rand
-import psi_functions
-import discrete_mapping
-from visualization_tools import drawCoefficient_origin, d3sol
-import buildcoef2d
-from visualize import drawCoefficientGrid
+from MasterthesisLOD import pg_pert, buildcoef2d
+from gridlod_on_perturbations import discrete_mapping
+from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin, d3sol
+from MasterthesisLOD.visualize import drawCoefficientGrid
 
 fine = 256
 NFine = np.array([fine,fine])
 NCoeff = np.array([32,32])
 NpFine = np.prod(NFine + 1)
-# list of coarse meshes
+
 N = 4
 
 #perturbation
@@ -126,11 +122,6 @@ energy_norm = np.sqrt(np.dot(uFineFull_pert, AFine_pert * uFineFull_pert))
 energy_error = np.sqrt(np.dot((uFineFull_trans_pert - uFineFull_pert), AFine_pert * (uFineFull_trans_pert - uFineFull_pert)))
 print("Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error, energy_error/energy_norm))
 
-# energy_error.append(
-#     np.sqrt(np.dot(uFineFull - uFineFull_transformed, AFine * (uFineFull - uFineFull_transformed))))
-# exact_problem.append(uFineFull)
-# non_transformed_problem.append(uFineFullJAJ)
-# transformed_problem.append(uFineFull_transformed)
 
 '''
 Plot solutions
@@ -138,28 +129,20 @@ Plot solutions
 fig = plt.figure(str(N))
 #fig.subplots_adjust(left=0.01,bottom=0.04,right=0.99,top=0.95,wspace=0,hspace=0.2)
 
-#ax = fig.add_subplot(221, projection='3d')
 ax = fig.add_subplot(221)
 ax.set_title('Solution to perturbed problem (perturbed domain)',fontsize=6)
-#d3solextra(NFine, uFineFull_pert, fig, ax, min, max)
 ax.imshow(np.reshape(uFineFull_pert, NFine+1), origin='lower_left')
 
-#ax = fig.add_subplot(222, projection='3d')
 ax = fig.add_subplot(222)
 ax.set_title('Solution to transformed problem (reference domain)',fontsize=6)
-#d3solextra(NFine, uFineFull_trans, fig, ax, min, max)
 ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
 
-#ax = fig.add_subplot(223, projection='3d')
 ax = fig.add_subplot(223)
 ax.set_title('Solution to remapped transformed problem (perturbed domain)',fontsize=6)
-#d3solextra(NFine, uFineFull_trans_pert, fig, ax, min, max)
 ax.imshow(np.reshape(uFineFull_trans_pert, NFine+1), origin='lower_left')
 
-#ax = fig.add_subplot(224, projection='3d')
 ax = fig.add_subplot(224)
 ax.set_title('Absolute error between perturbed and remapped transformed',fontsize=6)
-#d3solextra(NFine, uFineFull_trans_pert-uFineFull_pert, fig, ax, min, max)
 ax.imshow(np.reshape(uFineFull_trans_pert - uFineFull_pert, NFine+1), origin='lower_left')
 
 # PGLOD this is currently failing (see todo note)
@@ -169,15 +152,14 @@ NtCoarse = np.prod(NWorldCoarse)
 rCoarse = np.ones(NtCoarse)
 
 IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
-print(np.shape(aFine_ref))
 aFine_ref_tile = np.einsum('ij, t -> tij', np.eye(2), aFine_ref)
 rCoarse_mat = np.einsum('ij, t -> tij', np.eye(2), rCoarse)
 a_ref_coef = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aFine_ref_tile, rCoarse_mat)
 a_trans_coef = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aFine_trans, rCoarse_mat)
 
-pglod = pg_rand.VcPetrovGalerkinLOD(a_ref_coef, world, 2, IPatchGenerator, 3)
+pglod = pg_pert.PerturbedPetrovGalerkinLOD(a_ref_coef, world, 2, IPatchGenerator, 3)
 pglod.originCorrectors()
-vis, eps = pglod.updateCorrectors(a_trans_coef, 0.1, f_trans, 1, clearFineQuantities=False)
+vis, eps = pglod.updateCorrectors(a_trans_coef, 0.1, clearFineQuantities=False)
 
 elemente = np.arange(np.prod(NWorldCoarse))
 plt.figure()
