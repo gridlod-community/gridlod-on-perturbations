@@ -5,8 +5,9 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.sparse as sparse
 
-from gridlod import util, femsolver, func, interp, coef
+from gridlod import util, femsolver, func, interp, coef, fem
 from gridlod.world import World
 
 from MasterthesisLOD import pg_pert, buildcoef2d
@@ -19,7 +20,7 @@ NFine = np.array([fine,fine])
 NCoeff = np.array([32,32])
 NpFine = np.prod(NFine + 1)
 
-N = 4
+N = 8
 
 #perturbation
 alpha = 3./8.
@@ -151,6 +152,7 @@ ax.imshow(np.reshape(uFineFull_trans_pert - uFineFull_pert, NFine+1), origin='lo
 NtCoarse = np.prod(NWorldCoarse)
 rCoarse = np.ones(NtCoarse)
 
+# Setting up PGLOD
 IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
 aFine_ref_tile = np.einsum('ij, t -> tij', np.eye(2), aFine_ref)
 rCoarse_mat = np.einsum('ij, t -> tij', np.eye(2), rCoarse)
@@ -158,37 +160,30 @@ a_ref_coef = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aFine_re
 a_trans_coef = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aFine_trans, rCoarse_mat)
 
 pglod = pg_pert.PerturbedPetrovGalerkinLOD(a_ref_coef, world, 2, IPatchGenerator, 3)
-pglod.originCorrectors()
-vis, eps = pglod.updateCorrectors(a_trans_coef, 0.1, clearFineQuantities=False)
 
-elemente = np.arange(np.prod(NWorldCoarse))
-plt.figure()
-plt.plot(elemente,eps,label="e_{u,T}")
+# compute correctors
+pglod.originCorrectors(clearFineQuantities=False)
+vis, eps = pglod.updateCorrectors(a_trans_coef, 0, clearFineQuantities=False)
 
-fig = plt.figure("Correcting")
+fig = plt.figure("error indicator")
 ax = fig.add_subplot(1,1,1)
-drawCoefficientGrid(NWorldCoarse, vis,fig,ax)
+np_eps = np.einsum('i,i -> i', np.ones(np.size(eps)), eps)
+drawCoefficientGrid(NWorldCoarse, np_eps,fig,ax, original_style=True)
 
-# #
-# KFull = pglod.assembleMsStiffnessMatrix()
-# MFull = fem.assemblePatchMatrix(NWorldCoarse, world.MLocCoarse)
-# free = util.interiorpIndexMap(NWorldCoarse)
-#
-# bFull = MFull * f_trans
-# KFree = KFull[free][:, free]
-# bFree = bFull[free]
-#
-# xFree = sparse.linalg.spsolve(KFree, bFree)
-# basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
-#
-# basisCorrectors = pglod.assembleBasisCorrectors()
-#
-# modifiedBasis = basis - basisCorrectors
-#
-# NpCoarse = np.prod(NWorldCoarse+1)
-# xFull = np.zeros(NpCoarse)
-# xFull[free] = xFree
-# uCoarse = xFull
-# uLodFine = modifiedBasis * xFull
+#solve upscaled system
+uLodFine, _, _ = pglod.solve(f_trans)
+
+fig = plt.figure('new figure')
+ax = fig.add_subplot(121)
+ax.set_title('PGLOD Solution to transformed problem (reference domain)',fontsize=6)
+im = ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
+fig.colorbar(im)
+ax = fig.add_subplot(122)
+ax.set_title('FEM Solution to transformed problem (reference domain)',fontsize=6)
+im = ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
+fig.colorbar(im)
+
+energy_norm = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFine - uFineFull_trans)))
+print(energy_norm)
 
 plt.show()
