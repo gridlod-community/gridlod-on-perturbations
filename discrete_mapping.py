@@ -47,8 +47,19 @@ class MappingCQ1:
         return func.evaluateCQ1(self.N, self.inv_mapping, x)
 
     def J(self, x):
-        return func.evaluateCQ1D(self.N, self.mapping, x)
-    
+        derivative = func.evaluateCQ1D(self.N, self.mapping, x)
+        #This is a very stupid hack
+        for n in range(np.shape(derivative)[0]):
+            for i in range(2):
+                for j in range(2):
+                    if derivative[n][i][j] < 1e-10:
+                        if i == j:
+                            derivative[n][i][j] = 0.5
+                        else:
+                            derivative[n][i][j] = 0
+
+        return derivative
+
     def Jinv(self, x):
         return np.linalg.inv(self.J(x))
 
