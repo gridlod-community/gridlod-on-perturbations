@@ -22,7 +22,7 @@ def drawCoefficient_origin(N, a):
     cmap = plt.cm.plasma
 
     plt.imshow(aCube,
-               origin='lower',
+               origin='lower_left',
                interpolation='none',
                cmap=cmap)
     plt.colorbar()

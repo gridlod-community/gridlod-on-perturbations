@@ -14,7 +14,7 @@ from gridlod.world import World
 from MasterthesisLOD import pg_pert, buildcoef2d
 from gridlod_on_perturbations import discrete_mapping
 from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin, d3sol
-from MasterthesisLOD.visualize import drawCoefficientGrid
+from MasterthesisLOD.visualize import drawCoefficientGrid, drawCoefficient
 
 
 fine = 16
@@ -22,7 +22,7 @@ N = 8
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-space = fine//2 -1
+space = 4
 thick = 2
 
 bg = 0.01 		#background
@@ -67,19 +67,19 @@ number_of_channels = len(CoefClass.ShapeRemember)
 channels_position_from_zero = space
 channels_end_from_zero = channels_position_from_zero + thick
 
-for i in range(number_of_channels):
-    position = channels_position_from_zero * (i+1) + i * thick
-    left = position-space//2
-    right = position+thick + space//2 + 1 #this minus two is problem dependent
-    print(left, position, right)
-    cq1[:, left-1:right+1] = walk_with_perturbation
-    cq1[:, left - 2] = walk_with_perturbation * 2/ 3
-    cq1[:, left - 3] = walk_with_perturbation *1 / 3
-    cq1[:, right +1 ] = walk_with_perturbation* 2/ 3
-    cq1[:, right +2 ] = walk_with_perturbation * 1/ 3
+position = 7
+left = 3
+right = 14
+cq1[:, left:right] = walk_with_perturbation
+cq1[:, left - 1] = walk_with_perturbation * 2/ 3
+cq1[:, left - 2] = walk_with_perturbation *1 / 3
+cq1[:, right ] = walk_with_perturbation* 2/ 3
+cq1[:, right +1 ] = walk_with_perturbation * 1/ 3
 
 
-plt.plot(np.arange(0,fine+1),cq1[0,:])
+plt.plot(np.arange(0,fine+1),cq1[0,:], label= '$id(x) - \psi(x)$')
+plt.title('Domain mapping')
+plt.legend()
 cq1 = cq1.flatten()
 
 xpFine = util.pCoordinates(NFine)
@@ -113,13 +113,13 @@ aFine_pert = func.evaluateDQ0(NFine, aFine_ref, xtFine_ref)
 aBack_ref = func.evaluateDQ0(NFine, aFine_pert, xtFine_pert)
 
 plt.figure("Coefficient")
-drawCoefficient_origin(NFine, aFine_ref)
+drawCoefficient(NFine, aFine_ref)
 
 plt.figure("a_perturbed")
-drawCoefficient_origin(NFine, aFine_pert)
+drawCoefficient(NFine, aFine_pert)
 
 plt.figure("a_back")
-drawCoefficient_origin(NFine, aBack_ref)
+drawCoefficient(NFine, aBack_ref)
 
 # aFine_trans is the transformed perturbed reference coefficient
 aFine_trans = np.einsum('tji, t, tkj, t -> tik', psi.Jinv(xtFine), aFine_ref, psi.Jinv(xtFine), psi.detJ(xtFine))
