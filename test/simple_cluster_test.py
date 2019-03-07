@@ -6,13 +6,19 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from gridlod import util, femsolver, func, interp, coef, fem, pg
-from gridlod.world import World
+from gridlod import util, femsolver, func, interp, coef, fem, pglod, lod
+from gridlod.world import World, Patch
 
-from MasterthesisLOD import pg_pert, buildcoef2d
+from MasterthesisLOD import buildcoef2d
 from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin, d3sol
 
-fine = 256
+import ipyparallel as ipp
+
+client = ipp.Client(profile='slurm')
+client[:].use_cloudpickle()
+view = client.load_balanced_view()
+
+fine = 32
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
@@ -55,19 +61,21 @@ world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 
 uFineFull, AFine, _ = femsolver.solveFine(world, a_fine, f, None, boundaryConditions)
 
-# Setting up PGLOD
-IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
-a_fine_coef = coef.coefficientFine(NWorldCoarse, NCoarseElement, a_fine)
+k = 2
 
-pglod = pg_pert.PerturbedPetrovGalerkinLOD(a_fine_coef, world, 2, IPatchGenerator, 3, slurmCluster=True)
+def computeKmsij(TInd):
+    patch = Patch(world, k, TInd)
+    IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
+    aPatch = lambda: coef.localizeCoefficient(patch, a_fine)
 
-# compute correctors
-pglod.originCorrectors(clearFineQuantities=False)
+    correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)
+    csi = lod.computeBasisCoarseQuantities(patch, correctorsList, aPatch)
+    return patch, correctorsList, csi.Kmsij
 
-#solve upscaled system
-uLodFine, _, _ = pglod.solve(f)
 
-energy_norm = np.sqrt(np.dot(uLodFine - uFineFull, AFine * (uLodFine - uFineFull)))
-print(energy_norm)
+# Use mapper to distribute computations (mapper could be the 'map' built-in or e.g. an ipyparallel map)
+patchT, correctorsListT, KmsijT = zip(*view.map_sync(computeKmsij, range(world.NtCoarse)))
 
-#plt.show()
+KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
+
+print('finished')
