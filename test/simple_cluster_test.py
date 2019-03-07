@@ -15,6 +15,7 @@ from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin,
 import ipyparallel as ipp
 
 client = ipp.Client(profile='slurm')
+#client = ipp.Client(sshserver='local')
 client[:].use_cloudpickle()
 view = client.load_balanced_view()
 

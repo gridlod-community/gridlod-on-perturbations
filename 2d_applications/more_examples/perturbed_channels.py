@@ -9,18 +9,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.sparse as sparse
 
-from gridlod import util, world, fem, femsolver, func, interp, pg, coef
-from gridlod.world import World
+from gridlod import util, femsolver, func, interp, coef, fem, lod, pglod
+from gridlod.world import World, Patch
 
-import psi_functions
-import discrete_mapping
-from visualization_tools import drawCoefficient, drawCoefficient_origin, d3plotter, d3solextra, d3sol
-import buildcoef2d
+from MasterthesisLOD import buildcoef2d
+from gridlod_on_perturbations import discrete_mapping
+from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin, d3sol
+from MasterthesisLOD.visualize import drawCoefficientGrid
+
 
 
 fine = 128
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
+
+N = 8
 
 space = 16
 thick = 4
