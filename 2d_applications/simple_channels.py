@@ -8,10 +8,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from gridlod import util, femsolver, func, interp, coef, fem
-from gridlod.world import World
+from gridlod import util, femsolver, func, interp, coef, fem, lod
+from gridlod.world import World, Patch
 
-from MasterthesisLOD import pg_pert, buildcoef2d
+from MasterthesisLOD import buildcoef2d
 from gridlod_on_perturbations import discrete_mapping
 from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin, d3sol
 from MasterthesisLOD.visualize import drawCoefficientGrid, drawCoefficient
@@ -26,7 +26,7 @@ space = 4
 thick = 2
 
 bg = 0.01 		#background
-val = 1			#values
+val = 2			#values
 
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg                  = bg,
@@ -121,7 +121,10 @@ drawCoefficient(NFine, aFine_pert)
 plt.figure("a_back")
 drawCoefficient(NFine, aBack_ref)
 
+Aeye = np.tile(np.eye(2), [np.prod(NFine),1,1])
+
 # aFine_trans is the transformed perturbed reference coefficient
+aFine_pert_mat = np.einsum('tji, t, tkj -> tik', Aeye, aFine_ref, Aeye)
 aFine_trans = np.einsum('tji, t, tkj, t -> tik', psi.Jinv(xtFine), aFine_ref, psi.Jinv(xtFine), psi.detJ(xtFine))
 
 f_pert = np.ones(np.prod(NFine+1))
@@ -175,44 +178,65 @@ ax.set_title('Absolute error between perturbed and remapped transformed',fontsiz
 im = ax.imshow(np.reshape(uFineFull_trans_pert - uFineFull_pert, NFine+1), origin='lower_left')
 fig.colorbar(im)
 
-# PGLOD
+# # PGLOD
+#
+k = 1
 
-#for coarse coefficient
-NtCoarse = np.prod(NWorldCoarse)
-rCoarse = np.ones(NtCoarse)
+def computeKmsij(TInd):
+    patch = Patch(world, k, TInd)
+    IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
+    aPatch = lambda: coef.localizeCoefficient(patch, aFine_pert)
 
-# Setting up PGLOD
-IPatchGenerator = lambda i, N: interp.L2ProjectionPatchMatrix(i, N, NWorldCoarse, NCoarseElement, boundaryConditions)
-aFine_ref_tile = np.einsum('ij, t -> tij', np.eye(2), aFine_ref)
-rCoarse_mat = np.einsum('ij, t -> tij', np.eye(2), rCoarse)
-a_ref_coef = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aFine_ref_tile, rCoarse_mat)
-a_trans_coef = coef.coefficientCoarseFactor(NWorldCoarse, NCoarseElement, aFine_trans, rCoarse_mat)
+    correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)
+    csi = lod.computeBasisCoarseQuantities(patch, correctorsList, aPatch)
+    return patch, correctorsList, csi.Kmsij, csi
 
-pglod = pg_pert.PerturbedPetrovGalerkinLOD(a_ref_coef, world, 2, IPatchGenerator, 3)
+def computeIndicators(TInd):
+    patch = Patch(world, k, TInd)
+    aPatch = lambda: coef.localizeCoefficient(patch, aFine_pert_mat)
+    rPatch = lambda: coef.localizeCoefficient(patch, aFine_trans)
 
-# compute correctors
-pglod.originCorrectors(clearFineQuantities=False)
-vis, eps = pglod.updateCorrectors(a_trans_coef, 0, clearFineQuantities=False)
+    epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
+    epsCoarse = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
+    return epsFine, epsCoarse
+
+
+# Use mapper to distribute computations (mapper could be the 'map' built-in or e.g. an ipyparallel map)
+patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
+
+print('compute error indicators ...')
+epsFine, epsCoarse = zip(*map(computeIndicators, range(world.NtCoarse)))
 
 fig = plt.figure("error indicator")
 ax = fig.add_subplot(1,1,1)
-np_eps = np.einsum('i,i -> i', np.ones(np.size(eps)), eps)
+np_eps = np.einsum('i,i -> i', np.ones(np.size(epsFine)), epsFine)
 drawCoefficientGrid(NWorldCoarse, np_eps,fig,ax, original_style=True)
 
-#solve upscaled system
-uLodFine, _, _ = pglod.solve(f_trans)
+elemente = np.arange(np.prod(NWorldCoarse))
+plt.figure("Error indicators")
+plt.plot(elemente, epsFine, label="Fine")
+plt.plot(elemente, epsCoarse, label="Coarse")
+plt.ylabel('$e_{u,T}$')
+plt.xlabel('Element')
+plt.subplots_adjust(left=0.09, bottom=0.09, right=0.99, top=0.99, wspace=0.2, hspace=0.2)
+plt.legend(loc='upper right')  # Legende
+plt.grid()
 
-fig = plt.figure('new figure')
-ax = fig.add_subplot(121)
-ax.set_title('PGLOD Solution to transformed problem (reference domain)',fontsize=6)
-im = ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
-fig.colorbar(im)
-ax = fig.add_subplot(122)
-ax.set_title('FEM Solution to transformed problem (reference domain)',fontsize=6)
-im = ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
-fig.colorbar(im)
 
-energy_norm = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFine - uFineFull_trans)))
-print(energy_norm)
-
+# #solve upscaled system
+# uLodFine, _, _ = pglod.solve(f_trans)
+#
+# fig = plt.figure('new figure')
+# ax = fig.add_subplot(121)
+# ax.set_title('PGLOD Solution to transformed problem (reference domain)',fontsize=6)
+# im = ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
+# fig.colorbar(im)
+# ax = fig.add_subplot(122)
+# ax.set_title('FEM Solution to transformed problem (reference domain)',fontsize=6)
+# im = ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
+# fig.colorbar(im)
+#
+# energy_norm = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFine - uFineFull_trans)))
+# print(energy_norm)
+#
 plt.show()
