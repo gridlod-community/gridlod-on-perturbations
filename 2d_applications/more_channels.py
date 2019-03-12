@@ -51,7 +51,7 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
 aFine_ref_shaped = CoefClass.BuildCoefficient()
 aFine_ref = aFine_ref_shaped.flatten()
 number_of_channels = len(CoefClass.ShapeRemember)
-
+number_of_perturbed_channels = 6
 #I want to know the exact places of the channels
 ref_array = aFine_ref_shaped[0]
 now = 0
@@ -59,14 +59,14 @@ count = 0
 for i in range(np.size(ref_array)):
     if ref_array[i] == 1:
         count +=1
-    if count == number_of_channels//2-2:
+    if count == number_of_channels//2-number_of_perturbed_channels//2+1:
         begin = i+1
         break
 count = 0
 for i in range(np.size(ref_array)):
     if ref_array[i] == 1:
         count +=1
-    if count == number_of_channels//2 + 3:
+    if count == number_of_channels//2 + number_of_perturbed_channels//2+1:
         end = i
         break
 
@@ -82,7 +82,7 @@ channels_end_from_zero = channels_position_from_zero + thick
 
 left = begin
 right = end
-increasing_length = (end-begin)//5 - thick - 1
+increasing_length = (end-begin)//number_of_perturbed_channels - thick - 1
 constant_length = (end-begin) - increasing_length * 2
 maximum_walk = (increasing_length-1) * walk_with_perturbation
 walk_with_perturbation = maximum_walk

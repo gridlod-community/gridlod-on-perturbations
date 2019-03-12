@@ -4,6 +4,7 @@
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 
 from gridlod import util, femsolver, func, interp, coef, fem, lod, pglod
@@ -14,59 +15,87 @@ from gridlod_on_perturbations import discrete_mapping
 from gridlod_on_perturbations.visualization_tools import d3sol
 from MasterthesisLOD.visualize import drawCoefficientGrid, drawCoefficient
 
-
-fine = 128
-N = 16
-NFine = np.array([fine,fine])
-NpFine = np.prod(NFine + 1)
-
-space = 10
+bg = 0.01  # background
+val = 1  # values
+space = 1
 thick = 1
+fine = 64
+NFine = np.array([fine, fine])
 
-bg = 0.1		#background
-val = 1			#values
+#With this array, I construct the coefficient. It is a new feature in buildcoef2d
+ChoosingShapes = np.array([
+    # shape , len, thick, space
+    [   1,      1,     1,   1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [1, 1, 1, 1],
+    [4, fine - 2, 1, 5],
+    [4, fine - 2, 1, 5],
+    [4, fine - 2, 1, 5],
+    [4, fine - 2, 1, 5]])
 
 CoefClass = buildcoef2d.Coefficient2d(NFine,
-                        bg                  = bg,
-                        val                 = val,
-                        length              = 1,
-                        thick               = thick,
-                        space               = space,
-                        probfactor          = 1,
-                        right               = 1,
-                        down                = 0,
-                        diagr1              = 0,
-                        diagr2              = 0,
-                        diagl1              = 0,
-                        diagl2              = 0,
-                        LenSwitch           = None,
-                        thickSwitch         = None,
-                        equidistant         = True,
-                        ChannelHorizontal   = None,
-                        ChannelVertical     = True,
-                        BoundarySpace       = True)
+                                      bg=bg,
+                                      val=val,
+                                      right=1,
+                                      thick=thick,
+                                      space=space,
+                                      LenSwitch=None,
+                                      thickSwitch=None,
+                                      equidistant=True,
+                                      ChannelHorizontal=None,
+                                      ChannelVertical=None,
+                                      BoundarySpace=True,
+                                      probfactor=1,
+                                      ChoosingShapes=ChoosingShapes)
 
+A = CoefClass.BuildCoefficient()
 
-# Set reference coefficient
-aFine_ref_shaped = CoefClass.BuildCoefficient()
+#But for now, the coefficient class makes a small mistake, thus I let the fails disappear.
+Number = [8, 9]
+Correct = CoefClass.SpecificVanish(Number=Number)
+
+#Check whether the coefficient is correct
+plt.figure("Coefficient_")
+drawCoefficient(NFine, Correct.flatten())
+
+# This is for adding defects. If you want defects you have to uncomment the last line here
+random.seed(32)
+lis = np.zeros(80)
+lis[0] = 1
+for i in range(np.shape(CoefClass.ShapeRemember)[0]):
+    Number.append(i * random.sample(list(lis), 1)[0])
+Perturbed = CoefClass.SpecificVanish(Number=Number, Original=True).flatten()
+Perturbed = Correct.flatten()
+
+# basic init
+aFine_ref_shaped = Correct
 aFine_ref = aFine_ref_shaped.flatten()
-number_of_channels = len(CoefClass.ShapeRemember)
 
+#Now I construct the psi with DG functions
+
+number_of_perturbed_channels = 4
 #I want to know the exact places of the channels
-ref_array = aFine_ref_shaped[0]
+ref_array = aFine_ref_shaped[1]
 now = 0
 count = 0
 for i in range(np.size(ref_array)):
     if ref_array[i] == 1:
         count +=1
-    if count == number_of_channels//2:
+    if count == 8:   #at the 8ths shape (which is the last dot in one line, the cq starts)
         begin = i+1
         break
 count = 0
 for i in range(np.size(ref_array)):
     if ref_array[i] == 1:
         count +=1
-    if count == number_of_channels//2 + 2:
+    if count == 13:  #it ends after the last channel
         end = i
         break
 
@@ -74,26 +103,30 @@ for i in range(np.size(ref_array)):
 Nmapping = np.array([int(fine),int(fine)])
 cq1 = np.zeros((int(fine)+1,int(fine)+1))
 
+# I only want to perturb on the fine mesh.
 size_of_an_element = 1./fine
 walk_with_perturbation = size_of_an_element
 
 channels_position_from_zero = space
 channels_end_from_zero = channels_position_from_zero + thick
 
+#The next only have the purpose to make the psi invertible.
 left = begin
 right = end
-increasing_length = (end-begin)//2 - thick - 1
+increasing_length = (end-begin)//number_of_perturbed_channels - thick - 1 -1
 constant_length = (end-begin) - increasing_length * 2
-maximum_walk = (increasing_length-1) * walk_with_perturbation
+maximum_walk = (increasing_length-2) * walk_with_perturbation
 walk_with_perturbation = maximum_walk
 for i in range(increasing_length):
     cq1[:, begin+1+i] = (i+1)/increasing_length * walk_with_perturbation
     cq1[:, begin + increasing_length + i + constant_length] = walk_with_perturbation - (i+1)/increasing_length * walk_with_perturbation
-
 for i in range(constant_length):
     cq1[:, begin + increasing_length + i] = walk_with_perturbation
 
-plt.plot(np.arange(0,fine+1),cq1[0,:], label= '$id(x) - \psi(x)$')
+#Check what purtubation I have
+plt.figure('DomainMapping')
+plt.plot(np.arange(0,fine+1),cq1[space,:], label= '$id(x) - \psi(x)$')
+plt.plot(np.arange(0,fine),aFine_ref_shaped[space,:], label= '$aFine$')
 plt.title('Domain mapping')
 plt.legend()
 cq1 = cq1.flatten()
@@ -105,7 +138,6 @@ alpha = 1.
 
 for_mapping = np.stack((xpFine[:,0] + alpha * func.evaluateCQ1(Nmapping, cq1, xpFine), xpFine[:,1]), axis = 1)
 psi = discrete_mapping.MappingCQ1(NFine, for_mapping)
-
 
 # Compute grid points and mapped grid points
 # Grid naming:
@@ -124,7 +156,7 @@ xtFine_ref = psi.inverse_evaluate(xtFine)
 # ._ref     is a function defined on the uniform grid in the reference domain
 # ._trans   is a function defined on the uniform grid on the reference domain,
 #           after transformation from the perturbed domain
-aFine_pert = func.evaluateDQ0(NFine, aFine_ref, xtFine_ref)
+aFine_pert = func.evaluateDQ0(NFine, Perturbed, xtFine_ref)
 aBack_ref = func.evaluateDQ0(NFine, aFine_pert, xtFine_pert)
 
 plt.figure("Coefficient")
@@ -136,8 +168,12 @@ drawCoefficient(NFine, aFine_pert)
 plt.figure("a_back")
 drawCoefficient(NFine, aBack_ref)
 
+plt.figure("Perturbation with defects")
+Perturbed_and_shifted = func.evaluateDQ0(NFine, Perturbed, xtFine_ref)
+drawCoefficient(NFine, Perturbed_and_shifted)
+
 # aFine_trans is the transformed perturbed reference coefficient
-aFine_trans = np.einsum('tji, t, tkj, t -> tik', psi.Jinv(xtFine), aFine_ref, psi.Jinv(xtFine), psi.detJ(xtFine))
+aFine_trans = np.einsum('tji, t, tkj, t -> tik', psi.Jinv(xtFine), Perturbed, psi.Jinv(xtFine), psi.detJ(xtFine))
 
 f_pert = np.ones(np.prod(NFine+1))
 f_ref = func.evaluateCQ1(NFine, f_pert, xpFine_pert)
@@ -146,6 +182,7 @@ f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
 #d3sol(NFine,f, 'right hand side NT')
 d3sol(NFine, f_trans, 'right hand side T')
 
+N = 16
 NWorldCoarse = np.array([N, N])
 boundaryConditions = np.array([[0, 0],[0, 0]])
 
@@ -215,7 +252,7 @@ def computeIndicators(TInd):
 
 def computeIndicators_classic(TInd):
     aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref_shaped.flatten())
-    rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_pert)
+    rPatch = lambda: coef.localizeCoefficient(patchT[TInd], Perturbed_and_shifted)
 
     epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
     epsCoarse = 0
@@ -319,4 +356,5 @@ newErrorFine = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFin
 print('Error: {}'.format(newErrorFine))
 
 print('finished')
+
 plt.show()

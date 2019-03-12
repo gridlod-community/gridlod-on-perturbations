@@ -90,24 +90,44 @@ constant_length = (end-begin) - increasing_length * 2
 maximum_walk = (increasing_length-1) * walk_with_perturbation
 walk_with_perturbation = maximum_walk
 
-walk_specifier = np.random.randint(space-1,size=number_of_dots_per_dim)
-walk_specifier = [0,1,0,1,2,3,4,3,2,1,0,1,2,1,0]
-walk_specifier = np.ones(number_of_dots_per_dim)
+walk_specifier = np.random.randint(2,size=number_of_dots_per_dim)
+#walk_specifier = [0,1,0,1,2,3,4,3,2,1,0,1,2,1,0]
+walk_specifier = [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0]
+#walk_specifier = np.ones(number_of_dots_per_dim)
+#walk_specifier[6] = 0
 print(walk_specifier)
 for j in range(number_of_dots_per_dim):
     walk_with_perturbation = walk_specifier[j] *size_of_an_element
     begin_part = (space)*(j+1) + thick * j - space//2
     end_part = (space)*(j+1) + thick * (j+1) + space//2
+    increasing_length_part = (end_part - begin_part)//2-1
     if j == 0:
         begin_part = 0
     if j == number_of_dots_per_dim-1:
         end_part = fine
-    for i in range(increasing_length):
-        cq1[begin_part:end_part, begin+1+i] = (i+1)/increasing_length * walk_with_perturbation
-        cq1[begin_part:end_part, begin + increasing_length + i + constant_length] = walk_with_perturbation - (i+1)/increasing_length * walk_with_perturbation
+    #print(begin_part, end_part, increasing_length_part)
+    for l in range(begin_part,begin_part+increasing_length_part):
+        walk = walk_with_perturbation * (l-begin_part)/increasing_length_part
+        #print(l,end_part-1-l+begin_part,walk,walk_with_perturbation)
+        for i in range(increasing_length):
+            cq1[l, begin+1+i] = (i+1)/increasing_length * walk
+            cq1[l, begin + increasing_length + i + constant_length] = walk - (i+1)/increasing_length * walk
+        for i in range(constant_length):
+            cq1[l, begin + increasing_length + i] = walk
+        for i in range(increasing_length):
+            cq1[end_part-1-l+begin_part, begin+1+i] = (i+1)/increasing_length * walk
+            cq1[end_part-1-l+begin_part, begin + increasing_length + i + constant_length] = walk - (i+1)/increasing_length * walk
+        for i in range(constant_length):
+            cq1[end_part-1-l+begin_part, begin + increasing_length + i] = walk
+    for l in range(begin_part+increasing_length_part,end_part-increasing_length_part):
+        walk = walk_with_perturbation
+        #print(l,walk)
+        for i in range(increasing_length):
+            cq1[l, begin+1+i] = (i+1)/increasing_length * walk
+            cq1[l, begin + increasing_length + i + constant_length] = walk - (i+1)/increasing_length * walk
+        for i in range(constant_length):
+            cq1[l, begin + increasing_length + i] = walk
 
-    for i in range(constant_length):
-        cq1[begin_part:end_part, begin + increasing_length + i] = walk_with_perturbation
 
 plt.plot(np.arange(0,fine+1),cq1[space,:], label= '$id(x) - \psi(x)$')
 plt.title('Domain mapping')
@@ -288,51 +308,51 @@ for i in range(world.NtCoarse):
 print('.... to be updated for classic: {}%'.format(np.size(Elements_to_be_updated_classic)/np.size(epsFine)*100))
 print('.... to be updated for domain mapping: {}%'.format(np.size(Elements_to_be_updated)/np.size(epsFine)*100))
 
-print('update correctors')
-patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(UpdateCorrectors, Elements_to_be_updated))
-
-print('replace Kmsij and update correctorsListT')
-KmsijT_list = list(KmsijT)
-correctorsListT_list = list(correctorsListT)
-i=0
-for T in Elements_to_be_updated:
-    KmsijT_list[T] = KmsijTNew[i]
-    correctorsListT_list[T] = correctorsListTNew[i]
-    i+=1
-
-KmsijT = tuple(KmsijT_list)
-correctorsListT = tuple(correctorsListT_list)
-
-print('solve the system')
-KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
-
-MFull = fem.assemblePatchMatrix(NFine, world.MLocFine)
-
-basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
-basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
-modifiedBasis = basis - basisCorrectors
-
-bFull = MFull * f_trans
-bFull = basis.T * bFull
-
-uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
-
-uLodFine = modifiedBasis * uFull
-
-fig = plt.figure('new figure')
-ax = fig.add_subplot(121)
-ax.set_title('PGLOD Solution to transformed problem (reference domain)',fontsize=6)
-im = ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
-#fig.colorbar(im)
-ax = fig.add_subplot(122)
-ax.set_title('FEM Solution to transformed problem (reference domain)',fontsize=6)
-im = ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
-#fig.colorbar(im)
-
-newErrorFine = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFine - uFineFull_trans)))
-
-print('Error: {}'.format(newErrorFine))
-
-print('finished')
+# print('update correctors')
+# patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(UpdateCorrectors, Elements_to_be_updated))
+#
+# print('replace Kmsij and update correctorsListT')
+# KmsijT_list = list(KmsijT)
+# correctorsListT_list = list(correctorsListT)
+# i=0
+# for T in Elements_to_be_updated:
+#     KmsijT_list[T] = KmsijTNew[i]
+#     correctorsListT_list[T] = correctorsListTNew[i]
+#     i+=1
+#
+# KmsijT = tuple(KmsijT_list)
+# correctorsListT = tuple(correctorsListT_list)
+#
+# print('solve the system')
+# KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
+#
+# MFull = fem.assemblePatchMatrix(NFine, world.MLocFine)
+#
+# basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
+# basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
+# modifiedBasis = basis - basisCorrectors
+#
+# bFull = MFull * f_trans
+# bFull = basis.T * bFull
+#
+# uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
+#
+# uLodFine = modifiedBasis * uFull
+#
+# fig = plt.figure('new figure')
+# ax = fig.add_subplot(121)
+# ax.set_title('PGLOD Solution to transformed problem (reference domain)',fontsize=6)
+# im = ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
+# #fig.colorbar(im)
+# ax = fig.add_subplot(122)
+# ax.set_title('FEM Solution to transformed problem (reference domain)',fontsize=6)
+# im = ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
+# #fig.colorbar(im)
+#
+# newErrorFine = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFine - uFineFull_trans)))
+#
+# print('Error: {}'.format(newErrorFine))
+#
+# print('finished')
 
 plt.show()
