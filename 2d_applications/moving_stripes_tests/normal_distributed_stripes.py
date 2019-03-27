@@ -4,6 +4,7 @@
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 
 from gridlod import util, femsolver, func, interp, coef, fem, lod, pglod
@@ -15,15 +16,15 @@ from gridlod_on_perturbations.visualization_tools import d3sol
 from MasterthesisLOD.visualize import drawCoefficientGrid, drawCoefficient
 
 
-fine = 16
-N = 8
+fine = 256
+N = 16
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-space = 4
+space = 20
 thick = 2
 
-bg = 0.01 		#background
+bg = 0.1		#background
 val = 1			#values
 
 CoefClass = buildcoef2d.Coefficient2d(NFine,
@@ -48,34 +49,51 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
 
 
 # Set reference coefficient
-aCoarse_ref_shaped = CoefClass.BuildCoefficient()
-
-aCoarse_ref = aCoarse_ref_shaped.flatten()
-aFine_ref = aCoarse_ref
-
+aFine_ref_shaped = CoefClass.BuildCoefficient()
+aFine_ref_shaped = CoefClass.SpecificMove(Number=np.arange(0,10), steps=4, Right=1)
+aFine_ref = aFine_ref_shaped.flatten()
+number_of_channels = len(CoefClass.ShapeRemember)
 
 # Discrete mapping
 Nmapping = np.array([int(fine),int(fine)])
 cq1 = np.zeros((int(fine)+1,int(fine)+1))
 
 size_of_an_element = 1./fine
-walk_with_perturbation =  size_of_an_element
-number_of_channels = len(CoefClass.ShapeRemember)
+walk_with_perturbation = size_of_an_element
 
 channels_position_from_zero = space
 channels_end_from_zero = channels_position_from_zero + thick
 
-position = 7
-left = 3
-right = 14
-cq1[:, left:right] = walk_with_perturbation
-cq1[:, left - 1] = walk_with_perturbation * 2/ 3
-cq1[:, left - 2] = walk_with_perturbation *1 / 3
-cq1[:, right ] = walk_with_perturbation* 2/ 3
-cq1[:, right +1 ] = walk_with_perturbation * 1/ 3
+#I want to know the exact places of the channels
+ref_array = aFine_ref_shaped[0]
 
+eps_range = 0.03
+for c in range(number_of_channels):
+    now = 0
+    count = 0
+    for i in range(np.size(ref_array)):
+        if ref_array[i] == 1:
+            count +=1
+        if count == (c+1)*thick:
+            begin = i + 1 - space // 2
+            end = i + 1 + thick+ space // 2
+            break
+
+    left = begin
+    right = end
+    increasing_length = 3
+    constant_length = (end-begin) - increasing_length * 2
+    epsilon = np.random.uniform(-eps_range, eps_range)
+    walk = epsilon
+    for i in range(increasing_length):
+        cq1[:, begin+1+i] = (i+1)/increasing_length * walk
+        cq1[:, begin + increasing_length + i + constant_length] = walk - (i+1)/increasing_length * walk
+
+    for i in range(constant_length):
+        cq1[:, begin + increasing_length + i] = walk
 
 plt.plot(np.arange(0,fine+1),cq1[0,:], label= '$id(x) - \psi(x)$')
+plt.plot(np.arange(0,fine),ref_array*0.01)
 plt.title('Domain mapping')
 plt.legend()
 cq1 = cq1.flatten()
@@ -108,6 +126,12 @@ xtFine_ref = psi.inverse_evaluate(xtFine)
 #           after transformation from the perturbed domain
 aFine_pert = func.evaluateDQ0(NFine, aFine_ref, xtFine_ref)
 aBack_ref = func.evaluateDQ0(NFine, aFine_pert, xtFine_pert)
+
+is_this_invertible = np.linalg.norm(aBack_ref-aFine_ref)
+if is_this_invertible > 0.001:
+    print('Psi is not invertible')
+else:
+    print('Psi is invertible')
 
 plt.figure("Coefficient")
 drawCoefficient(NFine, aFine_ref)
@@ -195,6 +219,15 @@ def computeIndicators(TInd):
     #epsCoarse = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
     return epsFine, epsCoarse
 
+def computeIndicators_classic(TInd):
+    aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref_shaped.flatten())
+    rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_pert)
+
+    epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
+    epsCoarse = 0
+    #epsCoarse = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
+    return epsFine, epsCoarse
+
 def UpdateCorrectors(TInd):
     patch = Patch(world, k, TInd)
     IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
@@ -208,20 +241,43 @@ def UpdateCorrectors(TInd):
 # Use mapper to distribute computations (mapper could be the 'map' built-in or e.g. an ipyparallel map)
 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 
-print('compute error indicators')
+print('compute domain mapping error indicators')
 epsFine, epsCoarse = zip(*map(computeIndicators, range(world.NtCoarse)))
 
 fig = plt.figure("error indicator")
 ax = fig.add_subplot(1,1,1)
+ax.set_title("Error indicator in the reference domain")
 np_eps = np.einsum('i,i -> i', np.ones(np.size(epsFine)), epsFine)
-drawCoefficientGrid(NWorldCoarse, np_eps,fig,ax, original_style=True)
+drawCoefficientGrid(NWorldCoarse, np_eps,fig,ax, original_style=True, logplot=True)
+
+print('compute classic error indicators')
+epsFine_classic, epsCoarse = zip(*map(computeIndicators_classic, range(world.NtCoarse)))
+
+fig = plt.figure("error indicator classic")
+ax = fig.add_subplot(1,1,1)
+ax.set_title("Classic error indicator in the perturbed domain")
+np_eps_classic = np.einsum('i,i -> i', np.ones(np.size(epsFine)), epsFine_classic)
+drawCoefficientGrid(NWorldCoarse, np_eps_classic,fig,ax, original_style=True, logplot=True)
+
+plt.figure("compare error indicators")
+plt.title("horizontal slice")
+plt.semilogy(np.arange(N), np_eps_classic.reshape(NWorldCoarse,order='F').T[0], label='perturbed domain')
+plt.semilogy(np.arange(N), np_eps.reshape(NWorldCoarse,order='F').T[0], label='reference domain')
+plt.legend()
+plt.xlabel('fine elements')
 
 print('apply tolerance')
+Elements_to_be_updated_classic = []
 Elements_to_be_updated = []
+TOL = 100
 for i in range(world.NtCoarse):
-    if epsFine[i] >= 0.3:
+    if epsFine[i] >= TOL:
         Elements_to_be_updated.append(i)
-print('.... to be updated: {}'.format(np.size(Elements_to_be_updated)/np.size(epsFine)))
+    if epsFine_classic[i] >= TOL:
+        Elements_to_be_updated_classic.append(i)
+
+print('.... to be updated for classic: {}%'.format(np.size(Elements_to_be_updated_classic)/np.size(epsFine)*100))
+print('.... to be updated for domain mapping: {}%'.format(np.size(Elements_to_be_updated)/np.size(epsFine)*100))
 
 print('update correctors')
 patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(UpdateCorrectors, Elements_to_be_updated))
@@ -258,16 +314,15 @@ fig = plt.figure('new figure')
 ax = fig.add_subplot(121)
 ax.set_title('PGLOD Solution to transformed problem (reference domain)',fontsize=6)
 im = ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
-fig.colorbar(im)
+#fig.colorbar(im)
 ax = fig.add_subplot(122)
 ax.set_title('FEM Solution to transformed problem (reference domain)',fontsize=6)
 im = ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
-fig.colorbar(im)
+#fig.colorbar(im)
 
 newErrorFine = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFine - uFineFull_trans)))
 
 print('Error: {}'.format(newErrorFine))
 
 print('finished')
-
 plt.show()

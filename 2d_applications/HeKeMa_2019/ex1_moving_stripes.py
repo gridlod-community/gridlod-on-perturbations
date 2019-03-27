@@ -55,12 +55,15 @@ global aFine_pert
 global k
 global KmsijT
 global correctorsListT
+global f_trans
 
 # Set reference coefficient
 aFine_ref_shaped = CoefClass.BuildCoefficient()
 aFine_ref_shaped = CoefClass.SpecificMove(Number=np.arange(0,10), steps=4, Right=1)
 aFine_ref = aFine_ref_shaped.flatten()
 number_of_channels = len(CoefClass.ShapeRemember)
+
+f_pert = np.ones(np.prod(NFine+1))
 
 # Discrete mapping
 Nmapping = np.array([int(fine),int(fine)])
@@ -88,6 +91,7 @@ ref_array = aFine_ref_shaped[0]
 
 def create_psi_function(eps_range):
     global aFine_pert
+    global f_trans
     epsilonT = []
     cq1 = np.zeros((int(fine) + 1, int(fine) + 1))
     for c in range(number_of_channels):
@@ -126,14 +130,19 @@ def create_psi_function(eps_range):
 
     xtFine_pert = psi.evaluate(xtFine)
     xtFine_ref = psi.inverse_evaluate(xtFine)
+    xpFine_pert = psi.evaluate(xpFine)
+    xpFine_ref = psi.inverse_evaluate(xpFine)
 
     aFine_pert = func.evaluateDQ0(NFine, aFine_ref, xtFine_ref)
     aBack_ref = func.evaluateDQ0(NFine, aFine_pert, xtFine_pert)
 
+    f_ref = func.evaluateCQ1(NFine, f_pert, xpFine_pert)
+    f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
+
     is_this_invertible = np.linalg.norm(aBack_ref-aFine_ref)
     #print('Psi is invertible if this is zero: {}'.format(is_this_invertible))
     every_psi_was_valid.append(is_this_invertible)
-    if is_this_invertible > 0.01:
+    if is_this_invertible > 0.001:
         print('Psi is not invertible... try again ...'.format(is_this_invertible), end='')
         return create_psi_function(eps_range)   ## make sure that it works
     else:
@@ -153,9 +162,9 @@ def computeIndicators(TInd):
     aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref)
     rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_trans)
 
-    epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
+    #epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
     epsCoarse = 0
-    #epsCoarse = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
+    epsFine = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
     return epsFine, epsCoarse
 
 def computeIndicators_classic(TInd):
@@ -163,9 +172,9 @@ def computeIndicators_classic(TInd):
     aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref_shaped.flatten())
     rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_pert)
 
-    epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
+    #epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
     epsCoarse = 0
-    #epsCoarse = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
+    epsFine = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
     return epsFine, epsCoarse
 
 def UpdateCorrectors(TInd):
@@ -180,10 +189,6 @@ def UpdateCorrectors(TInd):
 def Monte_Carlo_recomputations(psi):
     global aFine_ref
     global aFine_trans
-    global aFine_pert
-    global k
-    global KmsijT
-    global correctorsListT
 
     aFine_ref = aFine_ref_shaped.flatten()
 
@@ -193,54 +198,70 @@ def Monte_Carlo_recomputations(psi):
     Aeye = np.tile(np.eye(2), [np.prod(NFine), 1, 1])
     aFine_ref = np.einsum('tji, t-> tji', Aeye, aFine_ref)
 
-    #print('compute domain mapping error indicators')
     epsFine_dom_mapping, epsCoarse = zip(*map(computeIndicators, range(world.NtCoarse)))
-    #epsFine_classic, epsCoarse = zip(*map(computeIndicators_classic, range(world.NtCoarse)))
-    epsFine_classic, epsCoarse = epsFine_dom_mapping, epsCoarse
-
+    epsFine_classic, epsCoarse = zip(*map(computeIndicators_classic, range(world.NtCoarse)))
 
     return epsFine_dom_mapping, epsFine_classic
 
 print('start to compute offline stage')
-ROOT = 'results/stripes/'
+ROOT = '../results/stripes/'
 # Use mapper to distribute computations (mapper could be the 'map' built-in or e.g. an ipyparallel map)
 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 
-print('Starting Monte Carlo method...')
-MC = 300
+KmsijT_original = np.copy(KmsijT)
+correctorsListT_original = np.copy(correctorsListT)
 
-eps_ranges = [0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01]
+print('Starting Monte Carlo method...')
+MC = 100
+
+eps_ranges = [0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.03]
+eps_ranges = [0.003, 0.007, 0.01, 0.03]
+#eps_ranges = [0.00001]
+
 
 for eps_range in eps_ranges:
     print('_______________ The eps_range is {}'.format(eps_range))
     complete_tol_DM = []
     complete_tol_CL = []
+    complete_errors = []
     for m in range(MC):
         print('________________ step {} ______________'.format(m), end='')
         to_be_updatedT_DM = []
         to_be_updatedT_CL = []
-        TolT = []
+        energy_errorT = []
+
+        KmsijT = KmsijT_original
+        correctorsListT = correctorsListT_original
         psi, _, epsilon = create_psi_function(eps_range)
-        #print(epsilon)
+        print('compute indicators')
         epsFine_DM, epsFine_CL = Monte_Carlo_recomputations(psi)
+
         TOL = []
-        for tol in [1, 0.5, 0.1, 0.05, 0.01, 0.005, 0.001, 0.0005, 0.0001, 0.00005, 0.00001]:
-            TOL.append(tol)
         for tol in range(20):
+            TOL.append(np.round((10 - tol / 2) * 1, 1))
             TOL.append(np.round((10 - tol / 2) * 0.1, 2))
             TOL.append(np.round((10 - tol / 2) * 0.01, 3))
             TOL.append(np.round((10 - tol / 2) * 0.001, 4))
-            TOL.append(np.round((10 - tol / 2) * 0.0001, 5))
-            TOL.append(np.round((10 - tol / 2) * 0.00001, 6))
+            #TOL.append(np.round((10 - tol / 2) * 0.0001, 5))
+            #TOL.append(np.round((10 - tol / 2) * 0.00001, 6))
         TOL = list(set(TOL))
         TOL.sort()
+        TOL = TOL[len(TOL)-1:0:-1]
+        already_updated = []
+
+        uFineFull_pert, AFine_pert, _ = femsolver.solveFine(world, aFine_pert, f_pert, None, boundaryConditions)
+        #uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_trans, None, boundaryConditions)
+        init = 0
         for tol in TOL:
             Elements_to_be_updated_DM = []
             Elements_to_be_updated_CL = []
             for i in range(world.NtCoarse):
                 if epsFine_DM[i] >= tol:
-                    Elements_to_be_updated_DM.append(i)
-            to_be_updated_DM = np.size(Elements_to_be_updated_DM) / np.size(epsFine_DM) * 100
+                    if i not in already_updated:
+                        already_updated.append(i)
+                        Elements_to_be_updated_DM.append(i)
+
+            to_be_updated_DM = np.size(already_updated) / np.size(epsFine_DM) * 100
             to_be_updatedT_DM.append(to_be_updated_DM)
             for i in range(world.NtCoarse):
                 if epsFine_CL[i] >= tol:
@@ -248,22 +269,90 @@ for eps_range in eps_ranges:
             to_be_updated_CL = np.size(Elements_to_be_updated_CL) / np.size(epsFine_CL) * 100
             to_be_updatedT_CL.append(to_be_updated_CL)
 
-            #print('For epsilon = {} and a tolerance {}, we have to update {}'.format(np.linalg.norm(epsilon),tol,to_be_updated))
-        # plt.figure('compare')
-        # plt.semilogx(TOL,to_be_updatedT, label=str(m))
-        #plt.legend()
+            ## update domain mapping
+            if np.size(Elements_to_be_updated_DM) is not 0:
+                #print('.... to_be_updated_DM for tol {} : {}'.format(tol, to_be_updated_DM))
+                #print('update correctors')
+                _ , correctorsListTNew, KmsijTNew, _ = zip(
+                    *map(UpdateCorrectors, Elements_to_be_updated_DM))
+            else:
+                if init == 0:
+                    #print('.... to_be_updated_DM for tol {} : {}'.format(tol, to_be_updated_DM))
+                    init = 1
+                    pass
+                else:
+                    energy_errorT.append(energy_error)
+                    continue
+
+            #print('replace Kmsij and update correctorsListT')
+            KmsijT_list = list(KmsijT)
+            correctorsListT_list = list(correctorsListT)
+            i = 0
+            for T in Elements_to_be_updated_DM:
+                #print('I am updating element {}'.format(T))
+                KmsijT_list[T] = KmsijTNew[i]
+                correctorsListT_list[T] = correctorsListTNew[i]
+                i += 1
+
+            KmsijT = tuple(KmsijT_list)
+            correctorsListT = tuple(correctorsListT_list)
+
+            #print('Norm of the matrizes {}'.format(np.linalg.norm(KmsijT-KmsijT_original)))
+            KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
+
+            MFull = fem.assemblePatchMatrix(NFine, world.MLocFine)
+
+            basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
+            basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
+            modifiedBasis = basis - basisCorrectors
+
+            bFull = MFull * f_trans
+            bFull = basis.T * bFull
+
+            uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
+
+            uLodFine = modifiedBasis * uFull
+
+            xpFine_ref = psi.inverse_evaluate(xpFine)
+            uFineFull_trans_pert = func.evaluateCQ1(NFine, uLodFine, xpFine_ref)
+
+            #energy_norm = np.sqrt(np.dot(uFineFull_pert, MFull * uFineFull_pert))
+            energy_error = np.sqrt(
+                np.dot((uFineFull_trans_pert - uFineFull_pert), AFine_pert * (uFineFull_trans_pert - uFineFull_pert)))
+
+            # energy_norm = np.sqrt(np.dot(uFineFull_trans, MFull * uFineFull_trans))
+            # energy_error = np.sqrt(
+            #     np.dot((uLodFine - uFineFull_trans), MFull * (uLodFine - uFineFull_trans)))
+
+            #print(
+            #    "TOL {}, Energy norm {}, error {}, rel. error {}".format(tol, energy_norm, energy_error, energy_error / energy_norm))
+
+            print('TOL: {}, updates: {}%, energy error: {}'.format(tol,to_be_updated_DM,energy_error))
+            energy_errorT.append(energy_error)
+
         complete_tol_DM.append(to_be_updatedT_DM)
         complete_tol_CL.append(to_be_updatedT_CL)
-    complete_tol_DM = 1/MC * np.sum(complete_tol_DM, axis=-2)
-    complete_tol_CL = 1/MC * np.sum(complete_tol_CL, axis=-2)
+        complete_errors.append(energy_errorT)
+
+    complete_tol_DM = 1./MC * np.sum(complete_tol_DM, axis=-2)
+    complete_tol_CL = 1./MC * np.sum(complete_tol_CL, axis=-2)
+    complete_errors = 1./MC * np.sum(complete_errors, axis=-2)
     plt.figure('average epsilon = ' + str(eps_range))
     plt.title('average' + str(eps_range))
     plt.semilogx(TOL, complete_tol_DM, label='domain mapping')
     #plt.semilogx(TOL, 1 / MC * complete_tol_CL, label='classic')
     plt.legend()
-    with open('{}/{}.txt'.format(ROOT,eps_range), 'w') as csvfile:
+    with open('{}/{}_DM.txt'.format(ROOT,eps_range), 'w') as csvfile:
         writer = csv.writer(csvfile)
         for val in complete_tol_DM:
+            writer.writerow([val])
+    with open('{}/{}_CL.txt'.format(ROOT, eps_range), 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for val in complete_tol_CL:
+            writer.writerow([val])
+    with open('{}/{}_error.txt'.format(ROOT, eps_range), 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for val in complete_errors:
             writer.writerow([val])
 
 with open("%s/TOLs.txt" % ROOT, 'w') as csvfile:

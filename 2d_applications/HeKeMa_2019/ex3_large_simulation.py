@@ -11,19 +11,22 @@ from gridlod.world import World, Patch
 from MasterthesisLOD import buildcoef2d
 from MasterthesisLOD.visualize import drawCoefficientGrid
 import timeit
-
+import time
 import ipyparallel as ipp
 
-#client = ipp.Client(profile='slurm')
-client = ipp.Client(sshserver='local')
+print('sleep one minute')
+time.sleep(60)
+
+client = ipp.Client(profile='slurm')
+#client = ipp.Client(sshserver='local')
 client[:].use_cloudpickle()
 view = client.load_balanced_view()
 
-fine = 2**10
+fine = 2**12
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-N = 2**6
+N = 2**8
 
 xpFine = util.pCoordinates(NFine)
 xtFine = util.tCoordinates(NFine)
@@ -73,22 +76,13 @@ print('computing took {} seconds'.format(end_runtime-start_runtime))
 k = 2
 start_runtime = timeit.default_timer()
 
-def computeKmsij(TInd):
-    patch = Patch(world, k, TInd)
-    IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
-    aPatch = lambda: coef.localizeCoefficient(patch, aFine_ref)
-
-    correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)
-    csi = lod.computeBasisCoarseQuantities(patch, correctorsList, aPatch)
-    return patch, correctorsList, csi.Kmsij, csi
-
 mid_element = N**2 //2 + N//2
 mid_patch = Patch(world, k, mid_element)
 IPatch = lambda: interp.L2ProjectionPatchMatrix(mid_patch, boundaryConditions)
 aPatch = lambda: coef.localizeCoefficient(mid_patch, aFine_ref)
 complete_size = np.size(aPatch())/np.prod(NCoarseElement)
 periodic_correctorList = lod.computeBasisCorrectors(mid_patch, IPatch, aPatch)
-periodic_csi = lod.computeBasisCoarseQuantities(mid_patch, periodic_correctorList, aPatch)
+periodic_kmsij = lod.computeBasisCoarseQuantities(mid_patch, periodic_correctorList, aPatch).Kmsij
 
 def computeKmsij_periodic(TInd):
     patch = Patch(world, k, TInd)
@@ -97,15 +91,14 @@ def computeKmsij_periodic(TInd):
     if np.size(aPatch())/np.prod(NCoarseElement) != complete_size:
         correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)
         csi = lod.computeBasisCoarseQuantities(patch, correctorsList, aPatch)
+        Kmsij = csi.Kmsij
     else:
         correctorsList = periodic_correctorList
-        csi = periodic_csi
-    return patch, correctorsList, csi.Kmsij, csi
+        Kmsij = periodic_kmsij
+    return patch, Kmsij
 
 #periodic
-patchT, correctorsListT, KmsijT, csiT = zip(*view.map_sync(computeKmsij_periodic, range(world.NtCoarse)))
-#nonperiodic
-#patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
+patchT, KmsijT = zip(*view.map_sync(computeKmsij_periodic, range(world.NtCoarse)))
 
 end_runtime = timeit.default_timer()
 print('computing took {} seconds'.format(end_runtime-start_runtime))
@@ -116,15 +109,13 @@ KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
 MFull = fem.assemblePatchMatrix(NFine, world.MLocFine)
 
 basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
-basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
-modifiedBasis = basis - basisCorrectors
 
 bFull = MFull * f_ref
 bFull = basis.T * bFull
 
 uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
 
-uLodFine = modifiedBasis * uFull
+uLodFine = basis * uFull
 
 newErrorFine = np.sqrt(np.dot(uLodFine - uFineFull_ref, AFine_ref * (uLodFine - uFineFull_ref)))
 

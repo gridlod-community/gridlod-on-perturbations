@@ -9,12 +9,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.sparse as sparse
 
-from gridlod import util, world, fem, femsolver, func, interp, pg, coef
+from gridlod import util, world, fem, femsolver, func, interp, coef
 from gridlod.world import World
 
 import psi_functions
 import discrete_mapping
-from visualization_tools import drawCoefficient, drawCoefficient_origin, d3plotter, d3solextra, d3sol
+from visualization_tools import drawCoefficient_origin
 import buildcoef2d
 
 
