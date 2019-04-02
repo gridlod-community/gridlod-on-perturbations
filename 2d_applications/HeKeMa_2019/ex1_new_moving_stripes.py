@@ -68,7 +68,7 @@ f_pert = np.ones(np.prod(NFine+1))
 Nmapping = np.array([int(fine),int(fine)])
 
 size_of_an_element = 1./fine
-print(size_of_an_element)
+print('the size of a fine element is {}'.format(size_of_an_element))
 walk_with_perturbation = size_of_an_element
 
 channels_position_from_zero = space
@@ -195,26 +195,26 @@ def Monte_Carlo_recomputations(psi):
     return epsFine_dom_mapping, epsFine_classic
 
 print('start to compute offline stage')
-ROOT = '../results/stripes_H_k_TOL/'
+ROOT = '../results/new_tol_stripes/'
 
 
 eps_ranges = [0.04]
 MC = 1
-NList = [4,8,16,32,64,128,256]
-kList = [1,2,3]
+NList = [4,8,16,32,64]
+kList = [2,3]
 
-TOL = []
-for tol in range(20):
-    TOL.append(np.round((10 - tol / 2) * 10, 0))
-    TOL.append(np.round((10 - tol / 2) * 1, 1))
-    TOL.append(np.round((10 - tol / 2) * 0.1, 2))
-    TOL.append(np.round((10 - tol / 2) * 0.01, 3))
-    TOL.append(np.round((10 - tol / 2) * 0.001, 4))
-    TOL.append(np.round((10 - tol / 2) * 0.0001, 5))
-    TOL.append(np.round((10 - tol / 2) * 0.00001, 6))
-TOL = list(set(TOL))
-TOL.sort()
-TOL = TOL[len(TOL) - 1:0:-1]
+# TOL = 100
+# for tol in range(20):
+#     TOL.append(np.round((10 - tol / 2) * 10, 0))
+#     TOL.append(np.round((10 - tol / 2) * 1, 1))
+#     TOL.append(np.round((10 - tol / 2) * 0.1, 2))
+#     TOL.append(np.round((10 - tol / 2) * 0.01, 3))
+#     TOL.append(np.round((10 - tol / 2) * 0.001, 4))
+#     TOL.append(np.round((10 - tol / 2) * 0.0001, 5))
+#     TOL.append(np.round((10 - tol / 2) * 0.00001, 6))
+# TOL = list(set(TOL))
+# TOL.sort()
+# TOL = TOL[len(TOL) - 1:0:-1]
 
 for eps_range in eps_ranges:
     print('_______________ The eps_range is {} '.format(eps_range), end='')
@@ -224,9 +224,12 @@ for eps_range in eps_ranges:
 
         for k in kList:
             for N in NList:
+                TOL = 100
+                TOLt = []
                 to_be_updatedT_DM = []
                 to_be_updatedT_CL = []
                 energy_errorT = []
+                tmp_errorT = []
 
                 NWorldCoarse = np.array([N, N])
                 boundaryConditions = np.array([[0, 0], [0, 0]])
@@ -243,22 +246,29 @@ for eps_range in eps_ranges:
 
                 uFineFull_pert, AFine_pert, _ = femsolver.solveFine(world, aFine_pert, f_pert, None, boundaryConditions)
                 #uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_trans, None, boundaryConditions)
-                init = 0
-                for tol in TOL:
+                init = 1
+
+                epsFine_DM = {i: epsFine_DM[i] for i in range(np.size(epsFine_DM)) if epsFine_DM[i] > 0}
+                epsFine_CL = {i: epsFine_CL[i] for i in range(np.size(epsFine_CL)) if epsFine_CL[i] > 0}
+
+                print('length of epsFine ', len(epsFine_DM))
+                continue_computing = 1
+                while continue_computing:
+                    TOLt.append(TOL)
                     Elements_to_be_updated_DM = []
                     Elements_to_be_updated_CL = []
-                    for i in range(world.NtCoarse):
-                        if epsFine_DM[i] >= tol:
+                    for (i,eps) in epsFine_DM.items():
+                        if eps >= TOL:
                             if i not in already_updated:
                                 already_updated.append(i)
                                 Elements_to_be_updated_DM.append(i)
 
-                    to_be_updated_DM = np.size(already_updated) / np.size(epsFine_DM) * 100
+                    to_be_updated_DM = np.size(already_updated) / len(epsFine_DM) * 100
                     to_be_updatedT_DM.append(to_be_updated_DM)
-                    for i in range(world.NtCoarse):
-                        if epsFine_CL[i] >= tol:
+                    for (i, eps) in epsFine_CL.items():
+                        if eps >= TOL:
                             Elements_to_be_updated_CL.append(i)
-                    to_be_updated_CL = np.size(Elements_to_be_updated_CL) / np.size(epsFine_CL) * 100
+                    to_be_updated_CL = np.size(Elements_to_be_updated_CL) / len(epsFine_CL) * 100
                     to_be_updatedT_CL.append(to_be_updated_CL)
 
                     ## update domain mapping
@@ -268,13 +278,20 @@ for eps_range in eps_ranges:
                         _ , correctorsListTNew, KmsijTNew, _ = zip(
                             *map(UpdateCorrectors, Elements_to_be_updated_DM))
                     else:
-                        if init == 0:
+                        if init:
                             #print('.... to_be_updated_DM for tol {} : {}'.format(tol, to_be_updated_DM))
-                            init = 1
                             pass
                         else:
                             energy_errorT.append(energy_error)
-                            continue
+                            tmp_errorT.append(old_tmp_energy_error)
+                            if np.size(already_updated) / len(epsFine_DM)==1:
+                                print('     every corrector has been updated')
+                                continue_computing = 0
+                                continue
+                            else:
+                                print('     skipping TOL {}'.format(TOL))
+                                TOL/=2.
+                                continue
 
                     #print('replace Kmsij and update correctorsListT')
                     KmsijT_list = list(KmsijT)
@@ -306,25 +323,37 @@ for eps_range in eps_ranges:
                     uLodFine = modifiedBasis * uFull
 
                     xpFine_ref = psi.inverse_evaluate(xpFine)
+
                     uFineFull_trans_pert = func.evaluateCQ1(NFine, uLodFine, xpFine_ref)
 
-                    #energy_norm = np.sqrt(np.dot(uFineFull_pert, MFull * uFineFull_pert))
+                    if init:
+                        uFineFull_trans_pert_old = uFineFull_trans_pert
+                        init = 0
+
+                    #tmp_error
+                    tmp_energy_error = np.sqrt(
+                        np.dot((uFineFull_trans_pert - uFineFull_trans_pert_old), AFine_pert * (uFineFull_trans_pert - uFineFull_trans_pert_old)))
+                    old_tmp_energy_error = tmp_energy_error
+                    #actual error
                     energy_error = np.sqrt(
                         np.dot((uFineFull_trans_pert - uFineFull_pert), AFine_pert * (uFineFull_trans_pert - uFineFull_pert)))
 
-                    # energy_norm = np.sqrt(np.dot(uFineFull_trans, MFull * uFineFull_trans))
-                    # energy_error = np.sqrt(
-                    #     np.dot((uLodFine - uFineFull_trans), MFull * (uLodFine - uFineFull_trans)))
+                    uFineFull_trans_pert_old = uFineFull_trans_pert
 
-                    #print(
-                    #    "TOL {}, Energy norm {}, error {}, rel. error {}".format(tol, energy_norm, energy_error, energy_error / energy_norm))
-
-                    print('          TOL: {}, updates: {}%, energy error: {}'.format(tol,to_be_updated_DM,energy_error))
+                    print('          TOL: {}, updates: {}%, energy error: {}, tmp_error:{}'.format(TOL,to_be_updated_DM,energy_error, tmp_energy_error))
                     energy_errorT.append(energy_error)
+                    tmp_errorT.append(tmp_energy_error)
+                    if tmp_energy_error > 0.0001:
+                        TOL /= 2.
+                    else:
+                        if int(np.size(already_updated) / len(epsFine_DM)) == 1:
+                            if np.size(Elements_to_be_updated_DM) is not 0:
+                                print('     stop computing')
+                                continue_computing = 0
 
                 plt.figure('average epsilon = ' + str(eps_range))
                 plt.title('average' + str(eps_range))
-                plt.semilogx(TOL, to_be_updatedT_DM, label='domain mapping')
+                plt.semilogx(TOLt, to_be_updatedT_DM, label='domain mapping')
                 plt.legend()
                 with open('{}/{}_k{}_H{}_DM.txt'.format(ROOT,eps_range, k, N), 'w') as csvfile:
                     writer = csv.writer(csvfile)
@@ -338,11 +367,16 @@ for eps_range in eps_ranges:
                     writer = csv.writer(csvfile)
                     for val in energy_errorT:
                         writer.writerow([val])
+                with open('{}/{}_k{}_H{}_tmp_error.txt'.format(ROOT, eps_range, k, N), 'w') as csvfile:
+                    writer = csv.writer(csvfile)
+                    for val in tmp_errorT:
+                        writer.writerow([val])
+                with open('{}/TOLs_k{}_H{}.txt'.format(ROOT,k,N), 'w') as csvfile:
+                    writer = csv.writer(csvfile)
+                    for val in TOLt:
+                        writer.writerow([val])
 
-with open("%s/TOLs.txt" % ROOT, 'w') as csvfile:
-    writer = csv.writer(csvfile)
-    for val in TOL:
-        writer.writerow([val])
+
 
 
 plt.show()
