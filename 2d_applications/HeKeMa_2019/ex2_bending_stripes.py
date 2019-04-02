@@ -14,15 +14,15 @@ from gridlod_on_perturbations import discrete_mapping
 from gridlod_on_perturbations.visualization_tools import d3sol
 from MasterthesisLOD.visualize import drawCoefficientGrid, drawCoefficient
 
-potenz = 8
+potenz = 6
 
 fine = 2**potenz
-N = 2**4
+N = 2**2
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-space = (potenz - 6)*10
-thick = (potenz - 6)*1
+space = 20
+thick = 1
 
 bg = 0.01		#background
 val = 1			#values
@@ -49,6 +49,10 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
 
 # Set reference coefficient
 aFine_ref_shaped = CoefClass.BuildCoefficient()
+
+# delete the second stripe that gets too much seperated
+# aFine_ref_shaped = CoefClass.SpecificVanish(Number=[1])
+
 aFine_ref = aFine_ref_shaped.flatten()
 
 xpFine = util.pCoordinates(NFine)
@@ -152,8 +156,12 @@ def computeKmsij(TInd):
     patch = Patch(world, k, TInd)
     IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
     aPatch = lambda: coef.localizeCoefficient(patch, aFine_ref)
+    aPatch2 = lambda: coef.localizeCoefficient(patch, aFine_trans)
 
     correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)
+    print('************* HERE THE ERROR OCCURS ***************************')
+    correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch2)
+    print('*********************************************NOT **************')
     csi = lod.computeBasisCoarseQuantities(patch, correctorsList, aPatch)
     return patch, correctorsList, csi.Kmsij, csi
 
@@ -161,84 +169,88 @@ def computeIndicators(TInd):
     aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref)
     rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_trans)
 
-    epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
+    #epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
     epsCoarse = 0
-    #epsCoarse = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
+    epsFine = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
     return epsFine, epsCoarse
 
 def UpdateCorrectors(TInd):
     patch = Patch(world, k, TInd)
     IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
-    rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_trans)
+    rPatch = lambda: coef.localizeCoefficient(patch, aFine_trans)
+    print(np.shape(aFine_trans))
+    print(np.shape(aFine_ref))
 
     correctorsList = lod.computeBasisCorrectors(patch, IPatch, rPatch)
     csi = lod.computeBasisCoarseQuantities(patch, correctorsList, rPatch)
     return patch, correctorsList, csi.Kmsij, csi
 
 
-# Use mapper to distribute computations (mapper could be the 'map' built-in or e.g. an ipyparallel map)
+
+print('computing corrections')
 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 
-print('compute error indicators')
-epsFine, epsCoarse = zip(*map(computeIndicators, range(world.NtCoarse)))
 
-fig = plt.figure("error indicator")
-ax = fig.add_subplot(1,1,1)
-np_eps = np.einsum('i,i -> i', np.ones(np.size(epsFine)), epsFine)
-drawCoefficientGrid(NWorldCoarse, np_eps,fig,ax, original_style=True)
+# print('computing error indicators')
+# epsFine, epsCoarse = zip(*map(computeIndicators, range(world.NtCoarse)))
+#
+# fig = plt.figure("error indicator")
+# ax = fig.add_subplot(1,1,1)
+# np_eps = np.einsum('i,i -> i', np.ones(np.size(epsFine)), epsFine)
+# drawCoefficientGrid(NWorldCoarse, np_eps,fig,ax, original_style=True)
+#
+# print('apply tolerance')
+# Elements_to_be_updated = []
+# for i in range(world.NtCoarse):
+#     if epsFine[i] >= 0.01:
+#         Elements_to_be_updated.append(i)
+# print('.... to be updated: {}'.format(np.size(Elements_to_be_updated)/np.size(epsFine) * 100))
+#
+# print('update correctors')
+# patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(UpdateCorrectors, Elements_to_be_updated))
 
-print('apply tolerance')
-Elements_to_be_updated = []
-for i in range(world.NtCoarse):
-    if epsFine[i] >= 0.01:
-        Elements_to_be_updated.append(i)
-print('.... to be updated: {}'.format(np.size(Elements_to_be_updated)/np.size(epsFine)))
-
-print('update correctors')
-patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(UpdateCorrectors, Elements_to_be_updated))
-
-print('replace Kmsij and update correctorsListT')
-KmsijT_list = list(KmsijT)
-correctorsListT_list = list(correctorsListT)
-i=0
-for T in Elements_to_be_updated:
-    KmsijT_list[T] = KmsijTNew[i]
-    correctorsListT_list[T] = correctorsListTNew[i]
-    i+=1
-
-KmsijT = tuple(KmsijT_list)
-correctorsListT = tuple(correctorsListT_list)
-
-print('solve the system')
-KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
-
-MFull = fem.assemblePatchMatrix(NFine, world.MLocFine)
-
-basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
-basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
-modifiedBasis = basis - basisCorrectors
-
-bFull = MFull * f_trans
-bFull = basis.T * bFull
-
-uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
-
-uLodFine = modifiedBasis * uFull
-
-fig = plt.figure('new figure')
-ax = fig.add_subplot(121)
-ax.set_title('PGLOD Solution to transformed problem (reference domain)',fontsize=6)
-im = ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
-fig.colorbar(im)
-ax = fig.add_subplot(122)
-ax.set_title('FEM Solution to transformed problem (reference domain)',fontsize=6)
-im = ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
-fig.colorbar(im)
-
-newErrorFine = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFine - uFineFull_trans)))
-
-print('Error: {}'.format(newErrorFine))
-
-print('finished')
-
+# print('replace Kmsij and update correctorsListT')
+# KmsijT_list = list(KmsijT)
+# correctorsListT_list = list(correctorsListT)
+# i=0
+# for T in Elements_to_be_updated:
+#     KmsijT_list[T] = KmsijTNew[i]
+#     correctorsListT_list[T] = correctorsListTNew[i]
+#     i+=1
+#
+# KmsijT = tuple(KmsijT_list)
+# correctorsListT = tuple(correctorsListT_list)
+#
+# print('solve the system')
+# KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
+#
+# MFull = fem.assemblePatchMatrix(NFine, world.MLocFine)
+#
+# basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
+# basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
+# modifiedBasis = basis - basisCorrectors
+#
+# bFull = MFull * f_trans
+# bFull = basis.T * bFull
+#
+# uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
+#
+# uLodFine = modifiedBasis * uFull
+#
+# fig = plt.figure('new figure')
+# ax = fig.add_subplot(121)
+# ax.set_title('PGLOD Solution to transformed problem (reference domain)',fontsize=6)
+# im = ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
+# fig.colorbar(im)
+# ax = fig.add_subplot(122)
+# ax.set_title('FEM Solution to transformed problem (reference domain)',fontsize=6)
+# im = ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
+# fig.colorbar(im)
+#
+# newErrorFine = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFine - uFineFull_trans)))
+#
+# print('Error: {}'.format(newErrorFine))
+#
+# print('finished')
+#
 plt.show()
