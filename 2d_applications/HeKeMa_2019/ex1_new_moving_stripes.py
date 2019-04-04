@@ -12,7 +12,7 @@ from gridlod.world import World, Patch
 
 from MasterthesisLOD import buildcoef2d
 from gridlod_on_perturbations import discrete_mapping
-from gridlod_on_perturbations.visualization_tools import d3sol
+from gridlod_on_perturbations.visualization_tools import d3sol, drawCoefficient_origin
 from MasterthesisLOD.visualize import drawCoefficientGrid, drawCoefficient
 import csv
 
@@ -20,7 +20,7 @@ fine = 256
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-space = 20
+space = 30
 thick = 2
 
 bg = 0.1		#background
@@ -46,6 +46,25 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         ChannelVertical     = True,
                         BoundarySpace       = True)
 
+# CoefClassRhs = buildcoef2d.Coefficient2d(NFine+1,
+#                         bg                  = 0.,
+#                         val                 = val,
+#                         length              = 1,
+#                         thick               = thick+2,
+#                         space               = space,
+#                         probfactor          = 1,
+#                         right               = 1,
+#                         down                = 0,
+#                         diagr1              = 0,
+#                         diagr2              = 0,
+#                         diagl1              = 0,
+#                         diagl2              = 0,
+#                         LenSwitch           = None,
+#                         thickSwitch         = None,
+#                         equidistant         = True,
+#                         ChannelHorizontal   = None,
+#                         ChannelVertical     = True,
+#                         BoundarySpace       = True)
 
 #global variables
 global aFine_ref
@@ -62,7 +81,12 @@ aFine_ref_shaped = CoefClass.SpecificMove(Number=np.arange(0,10), steps=4, Right
 aFine_ref = aFine_ref_shaped.flatten()
 number_of_channels = len(CoefClass.ShapeRemember)
 
-f_pert = np.ones(np.prod(NFine+1))
+f_pert = np.ones(NpFine)
+#f_pert = np.block([[np.zeros((fine,1)), aFine_ref_shaped], [np.zeros((1,fine+1))]]).flatten()
+
+# f_pert = CoefClassRhs.BuildCoefficient().flatten()
+# plt.figure('localized right hand side')
+# drawCoefficient_origin(NFine+1, f_pert)
 
 # Discrete mapping
 Nmapping = np.array([int(fine),int(fine)])
@@ -80,7 +104,7 @@ xtFine = util.tCoordinates(NFine)
 #I want to know the exact places of the channels
 ref_array = aFine_ref_shaped[0]
 
-def create_psi_function(eps_range):
+def create_psi_function(eps_range_in):
     global aFine_pert
     global f_trans
     epsilonT = []
@@ -95,9 +119,13 @@ def create_psi_function(eps_range):
                 end = i + 1 + thick+ space // 2
                 break
 
-        increasing_length = (end-begin)//2 - thick - 1
+
+        increasing_length = (end-begin)//2 - thick - 1 - 2
         constant_length = (end-begin) - increasing_length * 2
-        epsilon = np.random.uniform(-eps_range,eps_range)
+        if c == 3:
+            epsilon = 0.05
+        else:
+            epsilon = np.random.uniform(-eps_range,eps_range)
         #print(epsilon)
         epsilonT.append(epsilon)
         #epsilon = random.sample(list(np.arange(-increasing_length+3,increasing_length-2,1)), 1)[0]
@@ -110,6 +138,7 @@ def create_psi_function(eps_range):
         for i in range(constant_length):
             cq1[:, begin + increasing_length + i] = walk
 
+    print('Those are the results of the shift epsilon', epsilonT)
     cq1 = cq1.flatten()
 
     alpha = 1.
@@ -133,7 +162,7 @@ def create_psi_function(eps_range):
     is_this_invertible = np.linalg.norm(aBack_ref-aFine_ref)
     #print('Psi is invertible if this is zero: {}'.format(is_this_invertible))
 
-    if is_this_invertible > 0.001:
+    if is_this_invertible > 0.00001:
         print('.'.format(is_this_invertible), end='')
         return create_psi_function(eps_range)   ## make sure that it works
     else:
@@ -198,10 +227,11 @@ print('start to compute offline stage')
 ROOT = '../results/new_tol_stripes/'
 
 
-eps_ranges = [0.04]
+
+eps_ranges = [0.01]
 MC = 1
-NList = [4,8,16,32,64]
-kList = [2,3]
+NList = [32]
+kList = [2]
 
 # TOL = 100
 # for tol in range(20):
@@ -217,13 +247,18 @@ kList = [2,3]
 # TOL = TOL[len(TOL) - 1:0:-1]
 
 for eps_range in eps_ranges:
-    print('_______________ The eps_range is {} '.format(eps_range), end='')
     for m in range(MC):
         # print('________________ step {} ______________'.format(m), end='')
         psi, _, epsilon = create_psi_function(eps_range)
+        plt.figure("Coefficient")
+        drawCoefficient_origin(NFine, aFine_ref)
+
+        plt.figure("a_perturbed")
+        drawCoefficient_origin(NFine, aFine_pert)
 
         for k in kList:
             for N in NList:
+                print('precomputing for k {} and N {}  ...... '.format(k, N))
                 TOL = 100
                 TOLt = []
                 to_be_updatedT_DM = []
@@ -236,22 +271,42 @@ for eps_range in eps_ranges:
 
                 NCoarseElement = NFine // NWorldCoarse
                 world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
+                xpFine_ref = psi.inverse_evaluate(xpFine)
 
                 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 
                 epsFine_DM, epsFine_CL = Monte_Carlo_recomputations(psi)
                 already_updated = []
 
-                print('k: {}, N: {}'.format(k, N))
+                fig = plt.figure("error indicator k {} and N {}".format(k,N))
+                ax = fig.add_subplot(1, 1, 1)
+                ax.set_title("error indicator k {} and N {}".format(k,N))
+                np_eps = np.einsum('i,i -> i', np.ones(np.size(epsFine_DM)), epsFine_DM)
+                drawCoefficientGrid(NWorldCoarse, np_eps, fig, ax, original_style=True)
 
                 uFineFull_pert, AFine_pert, _ = femsolver.solveFine(world, aFine_pert, f_pert, None, boundaryConditions)
-                #uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_trans, None, boundaryConditions)
+                uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_trans, None,
+                                                                      boundaryConditions)
+
+                uFineFull_trans_pert = func.evaluateCQ1(NFine, uFineFull_trans, xpFine_ref)
+
+                energy_norm = np.sqrt(np.dot(uFineFull_pert, AFine_pert * uFineFull_pert))
+                energy_error = np.sqrt(np.dot((uFineFull_trans_pert - uFineFull_pert),
+                                              AFine_pert * (uFineFull_trans_pert - uFineFull_pert)))
+                print("Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error,
+                                                                       energy_error / energy_norm))
+
+                print('k: {}, N: {}'.format(k, N))
+
+                uFineFull_pert, AFine_pert = uFineFull_trans, AFine_trans
                 init = 1
 
                 epsFine_DM = {i: epsFine_DM[i] for i in range(np.size(epsFine_DM)) if epsFine_DM[i] > 0}
                 epsFine_CL = {i: epsFine_CL[i] for i in range(np.size(epsFine_CL)) if epsFine_CL[i] > 0}
 
-                print('length of epsFine ', len(epsFine_DM))
+                print('Starting Algorithm ...... ')
+
+                #print('length of epsFine ', len(epsFine_DM))
                 continue_computing = 1
                 while continue_computing:
                     TOLt.append(TOL)
@@ -322,12 +377,10 @@ for eps_range in eps_ranges:
 
                     uLodFine = modifiedBasis * uFull
 
-                    xpFine_ref = psi.inverse_evaluate(xpFine)
-
-                    uFineFull_trans_pert = func.evaluateCQ1(NFine, uLodFine, xpFine_ref)
+                    uFineFull_trans_pert = uLodFine
 
                     if init:
-                        uFineFull_trans_pert_old = uFineFull_trans_pert
+                        uFineFull_trans_pert_old = uLodFine
                         init = 0
 
                     #tmp_error

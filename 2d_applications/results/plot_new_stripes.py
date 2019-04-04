@@ -2,9 +2,9 @@ import csv
 import matplotlib.pyplot as plt
 
 ROOT = 'new_tol_stripes'
-eps_ranges = [0.04]
+eps_ranges = [0.01]
 NList = [32]
-kList = [3]
+kList = [2]
 
 Nstyles = {4:'k{}', 8:'y{}', 16:'b{}', 32:'g{}', 64:'k{}', 128:'k{}'}
 kstyles = {1:'{}', 2:'{}', 3:'{}', 4:'{}'}
@@ -59,6 +59,7 @@ for eps_range in eps_ranges:
                     j = i + 1
                 else:
                     break
+
             TOLt_tmp = TOLt[j:]
             tmp_errors = tmp_errors[j:]
             #line1 = ax1.loglog(TOLt_tmp, tmp_errors, Nstyles[N].format(kstyles[k].format('--')), label='gained error')
