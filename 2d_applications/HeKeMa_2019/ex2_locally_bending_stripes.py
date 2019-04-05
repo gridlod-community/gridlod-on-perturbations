@@ -21,8 +21,8 @@ N = 2**5
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-space = (potenz - 7) * 30
-thick = (potenz - 7) * 4
+space = (potenz - 7) * 20
+thick = (potenz - 7) * 3
 
 bg = 0.01		#background
 val = 1			#values
@@ -64,13 +64,24 @@ forward_mapping = np.stack([xpFine[:,0], xpFine[:,1]], axis=1)
 
 xpFine_shaped = xpFine.reshape(fine+1,fine+1,2)
 
-begin = int((fine+1)/2) + int(fine/8) - (potenz - 7)* 4 - 6 -5
-end = int((fine+1)/2) - int(fine/8) - (potenz - 7) * 4 - 2-5
-print(fine+1, begin, end)
-# end = int((fine+1)/4)
+middle = int((fine+1)/2) 
+intervall = int((fine+1)/8)-2
 
-part_x = xpFine_shaped[end:begin,end:begin,0]
-part_y = xpFine_shaped[end:begin,end:begin,1]
+left = middle - intervall
+right = middle + intervall
+
+left , right = 0, fine+1
+
+left_2 = middle - int(intervall)
+right_2 = middle + int(intervall)
+
+left , right = left_2, right_2
+
+print(fine+1, left, right)
+# begin = int((fine+1)/4)
+
+part_x = xpFine_shaped[left:right,left_2:right_2,0]
+part_y = xpFine_shaped[left:right,left_2:right_2,1]
 left_margin_x = np.min(part_x)
 right_margin_x = np.max(part_x)
 left_margin_y = np.min(part_y)
@@ -78,19 +89,19 @@ right_margin_y = np.max(part_y)
 
 print(left_margin_x,right_margin_x, left_margin_y, right_margin_y)
 
-epsilon = 35 / (right_margin_y-left_margin_y)  # why does this have to be so large???
+epsilon = 30 / (right_margin_y-left_margin_y)  # why does this have to be so large???
 
-forward_mapping_partial = np.stack([  xpFine_shaped[end:begin,end:begin,0]
+forward_mapping_partial = np.stack([  xpFine_shaped[left:right,left_2:right_2,0]
                     + epsilon*
-                        (                   xpFine_shaped[end:begin,end:begin,0] - left_margin_x)*
-                        (right_margin_x-    xpFine_shaped[end:begin,end:begin,0]                )*
-                        (                   xpFine_shaped[end:begin,end:begin,1] - left_margin_y)*
-                        (right_margin_y -   xpFine_shaped[end:begin,end:begin,1]                ),
-                                            xpFine_shaped[end:begin,end:begin,1]], axis=2)
+                        (                   xpFine_shaped[left:right,left_2:right_2,0] - left_margin_x)*
+                        (right_margin_x-    xpFine_shaped[left:right,left_2:right_2,0]                )*
+                        (                   xpFine_shaped[left:right,left_2:right_2,1] - left_margin_y)*
+                        (right_margin_y -   xpFine_shaped[left:right,left_2:right_2,1]                ),
+                                            xpFine_shaped[left:right,left_2:right_2,1]], axis=2)
 
 
 forward_mapping_shaped = forward_mapping.reshape(fine+1,fine+1,2)
-forward_mapping_shaped[end:begin,end:begin,:]= forward_mapping_partial
+forward_mapping_shaped[left:right,left_2:right_2,:]= forward_mapping_partial
 
 
 forward_mapping = forward_mapping_shaped.reshape((fine+1)**2,2)
@@ -127,159 +138,160 @@ drawCoefficient(NFine, aFine_pert)
 plt.figure("a_back")
 drawCoefficient(NFine, aBack_ref)
 
-# aFine_trans is the transformed perturbed reference coefficient
-aFine_trans = np.einsum('tij, t, tkj, t -> tik', psi.Jinv(xtFine), aFine_ref, psi.Jinv(xtFine), psi.detJ(xtFine))
+if 0:
+    # aFine_trans is the transformed perturbed reference coefficient
+    aFine_trans = np.einsum('tij, t, tkj, t -> tik', psi.Jinv(xtFine), aFine_ref, psi.Jinv(xtFine), psi.detJ(xtFine))
 
-f_pert = np.ones(np.prod(NFine+1))
-f_ref = func.evaluateCQ1(NFine, f_pert, xpFine_pert)
-f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
+    f_pert = np.ones(np.prod(NFine+1))
+    f_ref = func.evaluateCQ1(NFine, f_pert, xpFine_pert)
+    f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
 
-#d3sol(NFine,f, 'right hand side NT')
-d3sol(NFine, f_trans, 'right hand side T')
-
-
-NWorldCoarse = np.array([N, N])
-boundaryConditions = np.array([[0, 0],[0, 0]])
-
-NCoarseElement = NFine // NWorldCoarse
-world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
-
-# Naming of solutions
-# ._pert        is a solution in the perturbed domain
-# ._trans       is a solution in the reference domain, after transformation
-# ._trans_pert  is a solution in the perturbed domain, solved in the reference domain after transformation,
-#               but then remapped to the perturbed domain
-uFineFull_pert, AFine_pert, _ = femsolver.solveFine(world, aFine_pert, f_pert, None, boundaryConditions)
-uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_trans, None, boundaryConditions)
-
-uFineFull_trans_pert = func.evaluateCQ1(NFine, uFineFull_trans, xpFine_ref)
-
-energy_norm = np.sqrt(np.dot(uFineFull_pert, AFine_pert * uFineFull_pert))
-energy_error = np.sqrt(np.dot((uFineFull_trans_pert - uFineFull_pert), AFine_pert * (uFineFull_trans_pert - uFineFull_pert)))
-print("Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error, energy_error/energy_norm))
+    #d3sol(NFine,f, 'right hand side NT')
+    d3sol(NFine, f_trans, 'right hand side T')
 
 
-'''
-Plot solutions
-'''
-fig = plt.figure(str(N))
-#fig.subplots_adjust(left=0.01,bottom=0.04,right=0.99,top=0.95,wspace=0,hspace=0.2)
+    NWorldCoarse = np.array([N, N])
+    boundaryConditions = np.array([[0, 0],[0, 0]])
 
-ax = fig.add_subplot(221)
-ax.set_title('Solution to perturbed problem (perturbed domain)',fontsize=6)
-ax.imshow(np.reshape(uFineFull_pert, NFine+1), origin='lower_left')
+    NCoarseElement = NFine // NWorldCoarse
+    world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 
-ax = fig.add_subplot(222)
-ax.set_title('Solution to transformed problem (reference domain)',fontsize=6)
-ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
+    # Naming of solutions
+    # ._pert        is a solution in the perturbed domain
+    # ._trans       is a solution in the reference domain, after transformation
+    # ._trans_pert  is a solution in the perturbed domain, solved in the reference domain after transformation,
+    #               but then remapped to the perturbed domain
+    uFineFull_pert, AFine_pert, _ = femsolver.solveFine(world, aFine_pert, f_pert, None, boundaryConditions)
+    uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_trans, None, boundaryConditions)
 
-ax = fig.add_subplot(223)
-ax.set_title('Solution to remapped transformed problem (perturbed domain)',fontsize=6)
-ax.imshow(np.reshape(uFineFull_trans_pert, NFine+1), origin='lower_left')
+    uFineFull_trans_pert = func.evaluateCQ1(NFine, uFineFull_trans, xpFine_ref)
 
-ax = fig.add_subplot(224)
-ax.set_title('Absolute error between perturbed and remapped transformed',fontsize=6)
-ax.imshow(np.reshape(uFineFull_trans_pert - uFineFull_pert, NFine+1), origin='lower_left')
-
-k = 3
-
-Aeye = np.tile(np.eye(2), [np.prod(NFine), 1, 1])
-aFine_ref = np.einsum('tji, t-> tji', Aeye, aFine_ref)
-
-def computeKmsij(TInd):
-    patch = Patch(world, k, TInd)
-    IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
-    aPatch = lambda: coef.localizeCoefficient(patch, aFine_ref)
-    aPatch2 = lambda: coef.localizeCoefficient(patch, aFine_trans)
-
-    correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)
-    csi = lod.computeBasisCoarseQuantities(patch, correctorsList, aPatch)
-    return patch, correctorsList, csi.Kmsij, csi
-
-def computeIndicators(TInd):
-    aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref)
-    rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_trans)
-
-    #epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
-    epsCoarse = 0
-    epsFine = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
-    return epsFine, epsCoarse
-
-def UpdateCorrectors(TInd):
-    patch = Patch(world, k, TInd)
-    IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
-    rPatch = lambda: coef.localizeCoefficient(patch, aFine_trans)
-
-    correctorsList = lod.computeBasisCorrectors(patch, IPatch, rPatch)
-    csi = lod.computeBasisCoarseQuantities(patch, correctorsList, rPatch)
-    return patch, correctorsList, csi.Kmsij, csi
+    energy_norm = np.sqrt(np.dot(uFineFull_pert, AFine_pert * uFineFull_pert))
+    energy_error = np.sqrt(np.dot((uFineFull_trans_pert - uFineFull_pert), AFine_pert * (uFineFull_trans_pert - uFineFull_pert)))
+    print("Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error, energy_error/energy_norm))
 
 
+    '''
+    Plot solutions
+    '''
+    fig = plt.figure(str(N))
+    #fig.subplots_adjust(left=0.01,bottom=0.04,right=0.99,top=0.95,wspace=0,hspace=0.2)
 
-print('computing corrections')
-patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
+    ax = fig.add_subplot(221)
+    ax.set_title('Solution to perturbed problem (perturbed domain)',fontsize=6)
+    ax.imshow(np.reshape(uFineFull_pert, NFine+1), origin='lower_left')
+
+    ax = fig.add_subplot(222)
+    ax.set_title('Solution to transformed problem (reference domain)',fontsize=6)
+    ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
+
+    ax = fig.add_subplot(223)
+    ax.set_title('Solution to remapped transformed problem (perturbed domain)',fontsize=6)
+    ax.imshow(np.reshape(uFineFull_trans_pert, NFine+1), origin='lower_left')
+
+    ax = fig.add_subplot(224)
+    ax.set_title('Absolute error between perturbed and remapped transformed',fontsize=6)
+    ax.imshow(np.reshape(uFineFull_trans_pert - uFineFull_pert, NFine+1), origin='lower_left')
+
+    k = 3
+
+    Aeye = np.tile(np.eye(2), [np.prod(NFine), 1, 1])
+    aFine_ref = np.einsum('tji, t-> tji', Aeye, aFine_ref)
+
+    def computeKmsij(TInd):
+        patch = Patch(world, k, TInd)
+        IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
+        aPatch = lambda: coef.localizeCoefficient(patch, aFine_ref)
+        aPatch2 = lambda: coef.localizeCoefficient(patch, aFine_trans)
+
+        correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)
+        csi = lod.computeBasisCoarseQuantities(patch, correctorsList, aPatch)
+        return patch, correctorsList, csi.Kmsij, csi
+
+    def computeIndicators(TInd):
+        aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref)
+        rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_trans)
+
+        #epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
+        epsCoarse = 0
+        epsFine = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
+        return epsFine, epsCoarse
+
+    def UpdateCorrectors(TInd):
+        patch = Patch(world, k, TInd)
+        IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
+        rPatch = lambda: coef.localizeCoefficient(patch, aFine_trans)
+
+        correctorsList = lod.computeBasisCorrectors(patch, IPatch, rPatch)
+        csi = lod.computeBasisCoarseQuantities(patch, correctorsList, rPatch)
+        return patch, correctorsList, csi.Kmsij, csi
 
 
-print('computing error indicators')
-epsFine, epsCoarse = zip(*map(computeIndicators, range(world.NtCoarse)))
 
-fig = plt.figure("error indicator")
-ax = fig.add_subplot(1,1,1)
-np_eps = np.einsum('i,i -> i', np.ones(np.size(epsFine)), epsFine)
-drawCoefficientGrid(NWorldCoarse, np_eps,fig,ax, original_style=True)
+    print('computing corrections')
+    patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 
-print('apply tolerance')
-Elements_to_be_updated = []
-for i in range(world.NtCoarse):
-    if epsFine[i] >= 0.01:
-        Elements_to_be_updated.append(i)
-print('.... to be updated: {}'.format(np.size(Elements_to_be_updated)/np.size(epsFine) * 100))
 
-print('update correctors')
-patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(UpdateCorrectors, Elements_to_be_updated))
+    print('computing error indicators')
+    epsFine, epsCoarse = zip(*map(computeIndicators, range(world.NtCoarse)))
 
-print('replace Kmsij and update correctorsListT')
-KmsijT_list = list(KmsijT)
-correctorsListT_list = list(correctorsListT)
-i=0
-for T in Elements_to_be_updated:
-    KmsijT_list[T] = KmsijTNew[i]
-    correctorsListT_list[T] = correctorsListTNew[i]
-    i+=1
+    fig = plt.figure("error indicator")
+    ax = fig.add_subplot(1,1,1)
+    np_eps = np.einsum('i,i -> i', np.ones(np.size(epsFine)), epsFine)
+    drawCoefficientGrid(NWorldCoarse, np_eps,fig,ax, original_style=True)
 
-KmsijT = tuple(KmsijT_list)
-correctorsListT = tuple(correctorsListT_list)
+    print('apply tolerance')
+    Elements_to_be_updated = []
+    for i in range(world.NtCoarse):
+        if epsFine[i] >= 0.01:
+            Elements_to_be_updated.append(i)
+    print('.... to be updated: {}'.format(np.size(Elements_to_be_updated)/np.size(epsFine) * 100))
 
-print('solve the system')
-KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
+    print('update correctors')
+    patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(UpdateCorrectors, Elements_to_be_updated))
 
-MFull = fem.assemblePatchMatrix(NFine, world.MLocFine)
+    print('replace Kmsij and update correctorsListT')
+    KmsijT_list = list(KmsijT)
+    correctorsListT_list = list(correctorsListT)
+    i=0
+    for T in Elements_to_be_updated:
+        KmsijT_list[T] = KmsijTNew[i]
+        correctorsListT_list[T] = correctorsListTNew[i]
+        i+=1
 
-basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
-basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
-modifiedBasis = basis - basisCorrectors
+    KmsijT = tuple(KmsijT_list)
+    correctorsListT = tuple(correctorsListT_list)
 
-bFull = MFull * f_trans
-bFull = basis.T * bFull
+    print('solve the system')
+    KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
 
-uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
+    MFull = fem.assemblePatchMatrix(NFine, world.MLocFine)
 
-uLodFine = modifiedBasis * uFull
+    basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
+    basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
+    modifiedBasis = basis - basisCorrectors
 
-fig = plt.figure('new figure')
-ax = fig.add_subplot(121)
-ax.set_title('PGLOD Solution to transformed problem (reference domain)',fontsize=6)
-im = ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
-fig.colorbar(im)
-ax = fig.add_subplot(122)
-ax.set_title('FEM Solution to transformed problem (reference domain)',fontsize=6)
-im = ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
-fig.colorbar(im)
+    bFull = MFull * f_trans
+    bFull = basis.T * bFull
 
-newErrorFine = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFine - uFineFull_trans)))
+    uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
 
-print('Error: {}'.format(newErrorFine))
+    uLodFine = modifiedBasis * uFull
 
-print('finished')
+    fig = plt.figure('new figure')
+    ax = fig.add_subplot(121)
+    ax.set_title('PGLOD Solution to transformed problem (reference domain)',fontsize=6)
+    im = ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
+    fig.colorbar(im)
+    ax = fig.add_subplot(122)
+    ax.set_title('FEM Solution to transformed problem (reference domain)',fontsize=6)
+    im = ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
+    fig.colorbar(im)
+
+    newErrorFine = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFine - uFineFull_trans)))
+
+    print('Error: {}'.format(newErrorFine))
+
+    print('finished')
 
 plt.show()

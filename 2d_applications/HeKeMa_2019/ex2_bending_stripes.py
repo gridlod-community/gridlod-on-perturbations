@@ -94,7 +94,7 @@ plt.figure("a_back")
 drawCoefficient(NFine, aBack_ref)
 
 # aFine_trans is the transformed perturbed reference coefficient
-aFine_trans = np.einsum('tji, t, tkj, t -> tik', psi.Jinv(xtFine), aFine_ref, psi.Jinv(xtFine), psi.detJ(xtFine))
+aFine_trans = np.einsum('tij, t, tkj, t -> tik', psi.Jinv(xtFine), aFine_ref, psi.Jinv(xtFine), psi.detJ(xtFine))
 
 f_pert = np.ones(np.prod(NFine+1))
 f_ref = func.evaluateCQ1(NFine, f_pert, xpFine_pert)
