@@ -110,38 +110,49 @@ def create_psi_function(eps_range_in):
     epsilonT = []
     cq1 = np.zeros((int(fine) + 1, int(fine) + 1))
 
-    for c in range(number_of_channels):
-        count = 0
-        for i in range(np.size(ref_array)):
-            if ref_array[i] == 1:
-                count +=1
-            if count == (c+1)*thick:
-                begin = i + 1 - space // 2
-                end = i + 1 + thick+ space // 2
-                break
+    cs = np.random.randint(0,2,number_of_channels)
+    cs = [c * random.sample([-1,1],1)[0] for c in cs]
+    cs[3] = 20
+    cs[4] = 2
+    cs[5] = 1
 
+    print(cs)
 
-        increasing_length = (end-begin)//2 - thick - 1 - 2
-        constant_length = (end-begin) - increasing_length * 2
-        if c == 3:
-            epsilon = 20 * walk_with_perturbation
-        # elif c == 1:
-        #     epsilon = -2 * walk_with_perturbation
-        # elif c==4:
-        #     epsilon = 1 * walk_with_perturbation
-        else:
-            epsilon = 0
+    last_value = 0
+    for i, c in enumerate(cs):
+        platform = space//2 + 2 * thick
+        begin = platform//2 + i * (space + thick)
+        end = begin + space - platform + thick
 
-        #print(epsilon)
+        epsilon = c * walk_with_perturbation
         epsilonT.append(epsilon)
-        #walk = epsilon * walk_with_perturbation
-        walk = epsilon
+        walk = epsilon - last_value
+
+        constant_length = platform + thick
+        increasing_length = end - begin
+
         for i in range(increasing_length):
-            cq1[:, begin+1+i] = (i+1)/increasing_length * walk
-            cq1[:, begin + increasing_length + i + constant_length] = walk - (i+1)/increasing_length * walk
+            cq1[:, begin+i] = last_value + (i+1)/increasing_length * walk
 
         for i in range(constant_length):
-            cq1[:, begin + increasing_length + i] = walk
+            cq1[:, begin + increasing_length + i] = epsilon
+
+        last_value = epsilon
+
+    # ending
+    begin += space + thick
+    end = begin + space - platform + thick
+    epsilon = 0
+    walk = epsilon - last_value
+    increasing_length = end - begin
+    for i in range(increasing_length):
+        cq1[:, begin+i] = last_value + (i+1)/increasing_length * walk
+
+
+    plt.plot(np.arange(0, fine + 1), cq1[space, :], label='$id(x) - \psi(x)$')
+    plt.title('Domain mapping')
+    plt.legend()
+    plt.show()
 
     print('Those are the results of the shift epsilon', epsilonT)
     cq1 = cq1.flatten()

@@ -1,10 +1,10 @@
 import csv
 import matplotlib.pyplot as plt
 
-ROOT = 'new_tol_stripes'
-eps_ranges = [0.01]
+ROOT = 'moving_stripes'
+eps_ranges = [0]
 NList = [32]
-kList = [3]
+kList = [2]
 
 Nstyles = {4:'k{}', 8:'y{}', 16:'b{}', 32:'g{}', 64:'k{}', 128:'k{}'}
 kstyles = {1:'{}', 2:'{}', 3:'{}', 4:'{}'}
@@ -62,21 +62,23 @@ for eps_range in eps_ranges:
 
             TOLt_tmp = TOLt[j:]
             tmp_errors = tmp_errors[j:]
+
+            b = 12
+            e = -1
             #line1 = ax1.loglog(TOLt_tmp, tmp_errors, Nstyles[N].format(kstyles[k].format('--')), label='gained error')
-            line1 = ax1.loglog(TOLt, complete_errors, Nstyles[N].format(kstyles[k].format('--')), label='actual error')
+            line1 = ax1.loglog(TOLt[b:], complete_errors[b:], Nstyles[N].format(kstyles[k].format('--')), label='actual error')
             plt.ylabel('Error')
             plt.xlabel('TOL')
             plt.legend(fontsize='small', loc = 'right')
             plt.grid()
 
             ax2 = fig.add_subplot(111, sharex=ax1, frameon=False)
-
-            ax2.semilogx(TOLt, complete_tol_DM, Nstyles[N].format(kstyles[k].format('-')), label='updates')
+            ax2.semilogx(TOLt[b:], complete_tol_DM[b:], Nstyles[N].format(kstyles[k].format('-')), label='updates')
             #ax2.semilogx(TOL, complete_tol_CL, styles[eps_range].format('--'))
             ax2.yaxis.tick_right()
             ax2.yaxis.set_label_position("right")
             plt.ylabel('corrector updates in %')
-            plt.legend(fontsize='small', loc = 'lower center')
+            plt.legend(fontsize='small', loc = 'center left')
 
 
 

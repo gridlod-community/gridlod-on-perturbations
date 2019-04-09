@@ -1,7 +1,7 @@
 import csv
 import matplotlib.pyplot as plt
 
-ROOT = 'local_bending_stripes_5'
+ROOT = 'local_bending_dots'
 eps_ranges = [0]
 NList = [32]
 kList = [2]
@@ -62,18 +62,18 @@ for eps_range in eps_ranges:
 
             TOLt_tmp = TOLt[j:]
             tmp_errors = tmp_errors[j:]
-            #TOLt = TOLt[10:]
-            #complete_errors = complete_errors[10:]
-            #line1 = ax1.loglog(TOLt_tmp, tmp_errors, Nstyles[N].format(kstyles[k].format('--')), label='gained error')
-            line1 = ax1.loglog(TOLt, complete_errors, Nstyles[N].format(kstyles[k].format('--')), label='actual error')
+
+            b = 7
+            e = -1
+            line1 = ax1.loglog(TOLt_tmp, tmp_errors, Nstyles[N].format(kstyles[k].format('--')), label='gained error')
+            #line1 = ax1.loglog(TOLt[b:], complete_errors[b:], Nstyles[N].format(kstyles[k].format('--')), label='actual error')
             plt.ylabel('Error')
             plt.xlabel('TOL')
             plt.legend(fontsize='small', loc = 'right')
             plt.grid()
 
             ax2 = fig.add_subplot(111, sharex=ax1, frameon=False)
-
-            ax2.semilogx(TOLt, complete_tol_DM, Nstyles[N].format(kstyles[k].format('-')), label='updates')
+            ax2.semilogx(TOLt[b:], complete_tol_DM[b:], Nstyles[N].format(kstyles[k].format('-')), label='updates')
             #ax2.semilogx(TOL, complete_tol_CL, styles[eps_range].format('--'))
             ax2.yaxis.tick_right()
             ax2.yaxis.set_label_position("right")
