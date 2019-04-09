@@ -4,29 +4,28 @@
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
 import numpy as np
-
+import matplotlib.pyplot as plt
 from gridlod import util, femsolver, func, interp, coef, fem, lod, pglod
 from gridlod.world import World, Patch
 
+from visualization_tools import drawCoefficient_origin
 from MasterthesisLOD import buildcoef2d
 from MasterthesisLOD.visualize import drawCoefficientGrid
 import timeit
 import time
 import ipyparallel as ipp
 
-print('sleep one minute')
-time.sleep(60)
-
 client = ipp.Client(profile='slurm')
 #client = ipp.Client(sshserver='local')
 client[:].use_cloudpickle()
 view = client.load_balanced_view()
 
-fine = 2**12
+factor = 8
+fine = 2**8 * 2**(factor-8)
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-N = 2**8
+N = 2**4
 
 xpFine = util.pCoordinates(NFine)
 xtFine = util.tCoordinates(NFine)
@@ -38,9 +37,9 @@ val = 1			#values
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg                  = bg,
                         val                 = val,
-                        length              = 2,
-                        thick               = 2,
-                        space               = 2,
+                        length              = 1 * 2**(factor-8),
+                        thick               = 1 * 2**(factor-8),
+                        space               = 1 * 2**(factor-8),
                         probfactor          = 1,
                         right               = 1,
                         down                = 0,
@@ -56,7 +55,15 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         BoundarySpace       = False)
 
 aFine_shaped = CoefClass.BuildCoefficient()
+
+
+
 aFine_ref = aFine_shaped.flatten()
+
+fig = plt.figure('see')
+ax = fig.add_subplot(1,1,1)
+drawCoefficientGrid(NFine, aFine_ref, ax=ax, fig=fig)
+plt.show()
 
 f_ref = np.ones(np.prod(NFine+1))
 

@@ -15,8 +15,12 @@ from gridlod import util
 
 def drawCoefficient_origin(N, a):
     # This is drawCoefficient from test_pgtransport.py in gridlod
+    if a.ndim == 3:
+        a = np.linalg.norm(a, axis=(1, 2), ord=2)
+
     aCube = np.log10(a.reshape(N, order='F'))
     aCube = np.ascontiguousarray(aCube.T)
+
     plt.clf()
 
     cmap = plt.cm.plasma

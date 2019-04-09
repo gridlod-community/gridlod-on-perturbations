@@ -15,13 +15,16 @@ from gridlod_on_perturbations import discrete_mapping
 from gridlod_on_perturbations.visualization_tools import d3sol, drawCoefficient_origin
 from MasterthesisLOD.visualize import drawCoefficientGrid, drawCoefficient
 import csv
-factor = 2**1
-fine = 256 * factor
+
+potenz = 9
+factor = 2**(potenz - 8)
+fine = 2**potenz
+N = 2**5
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-space = 32 * factor
-thick = 4 * factor
+space = 6 * factor
+thick = 3 * factor
 
 bg = 0.1		#background
 val = 1			#values
@@ -29,7 +32,7 @@ val = 1			#values
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg                  = bg,
                         val                 = val,
-                        length              = 1,
+                        length              = thick,
                         thick               = thick,
                         space               = space,
                         probfactor          = 1,
@@ -43,28 +46,9 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         thickSwitch         = None,
                         equidistant         = True,
                         ChannelHorizontal   = None,
-                        ChannelVertical     = True,
+                        ChannelVertical     = None,
                         BoundarySpace       = True)
 
-# CoefClassRhs = buildcoef2d.Coefficient2d(NFine+1,
-#                         bg                  = 0.,
-#                         val                 = val,
-#                         length              = 1,
-#                         thick               = thick+2,
-#                         space               = space,
-#                         probfactor          = 1,
-#                         right               = 1,
-#                         down                = 0,
-#                         diagr1              = 0,
-#                         diagr2              = 0,
-#                         diagl1              = 0,
-#                         diagl2              = 0,
-#                         LenSwitch           = None,
-#                         thickSwitch         = None,
-#                         equidistant         = True,
-#                         ChannelHorizontal   = None,
-#                         ChannelVertical     = True,
-#                         BoundarySpace       = True)
 
 #global variables
 global aFine_ref
@@ -104,52 +88,55 @@ xtFine = util.tCoordinates(NFine)
 #I want to know the exact places of the channels
 ref_array = aFine_ref_shaped[0]
 
-def create_psi_function(eps_range_in):
+def create_psi_function():
     global aFine_pert
     global f_trans
     epsilonT = []
-    cq1 = np.zeros((int(fine) + 1, int(fine) + 1))
 
-    for c in range(number_of_channels):
-        count = 0
-        for i in range(np.size(ref_array)):
-            if ref_array[i] == 1:
-                count +=1
-            if count == (c+1)*thick:
-                begin = i + 1 - space // 2
-                end = i + 1 + thick+ space // 2
-                break
+    forward_mapping = np.stack([xpFine[:, 0], xpFine[:, 1]], axis=1)
 
+    xpFine_shaped = xpFine.reshape(fine + 1, fine + 1, 2)
+    left, right = 0, fine + 1
 
-        increasing_length = (end-begin)//2 - thick - 1 - 2
-        constant_length = (end-begin) - increasing_length * 2
-        if c == 3:
-            epsilon = 20 * walk_with_perturbation
-        # elif c == 1:
-        #     epsilon = -2 * walk_with_perturbation
-        # elif c==4:
-        #     epsilon = 1 * walk_with_perturbation
-        else:
-            epsilon = 0
+    for i in [1, 3]:
+        middle = int((fine + 1) * (i / 4))
+        intervall = int((fine + 1) / 8)
 
-        #print(epsilon)
-        epsilonT.append(epsilon)
-        #walk = epsilon * walk_with_perturbation
-        walk = epsilon
-        for i in range(increasing_length):
-            cq1[:, begin+1+i] = (i+1)/increasing_length * walk
-            cq1[:, begin + increasing_length + i + constant_length] = walk - (i+1)/increasing_length * walk
+        left_2 = middle - int(intervall)
+        right_2 = middle + int(intervall)
 
-        for i in range(constant_length):
-            cq1[:, begin + increasing_length + i] = walk
+        left, right = left_2, right_2
+
+        print(fine + 1, left, right)
+
+        part_x = xpFine_shaped[left:right, left_2:right_2, 0]
+        part_y = xpFine_shaped[left:right, left_2:right_2, 1]
+        left_margin_x = np.min(part_x)
+        right_margin_x = np.max(part_x)
+        left_margin_y = np.min(part_y)
+        right_margin_y = np.max(part_y)
+
+        print(left_margin_x, right_margin_x, left_margin_y, right_margin_y)
+
+        epsilon = 20 / (right_margin_y - left_margin_y)  # why does this have to be so large???
+
+        forward_mapping_partial = np.stack([xpFine_shaped[left:right, left_2:right_2, 0]
+                                            + epsilon *
+                                            (xpFine_shaped[left:right, left_2:right_2, 0] - left_margin_x) *
+                                            (right_margin_x - xpFine_shaped[left:right, left_2:right_2, 0]) *
+                                            (xpFine_shaped[left:right, left_2:right_2, 1] - left_margin_y) *
+                                            (right_margin_y - xpFine_shaped[left:right, left_2:right_2, 1]),
+                                            xpFine_shaped[left:right, left_2:right_2, 1]], axis=2)
+
+        forward_mapping_shaped = forward_mapping.reshape(fine + 1, fine + 1, 2)
+        forward_mapping_shaped[left:right, left_2:right_2, :] = forward_mapping_partial
+
+    forward_mapping = forward_mapping_shaped.reshape((fine + 1) ** 2, 2)
+
 
     print('Those are the results of the shift epsilon', epsilonT)
-    cq1 = cq1.flatten()
 
-    alpha = 1.
-
-    for_mapping = np.stack((xpFine[:, 0] + alpha * func.evaluateCQ1(Nmapping, cq1, xpFine), xpFine[:, 1]), axis=1)
-    psi = discrete_mapping.MappingCQ1(NFine, for_mapping)
+    psi = discrete_mapping.MappingCQ1(NFine, forward_mapping)
 
     aFine_ref = aFine_ref_shaped.flatten()
 
@@ -164,15 +151,7 @@ def create_psi_function(eps_range_in):
     f_ref = func.evaluateCQ1(NFine, f_pert, xpFine_pert)
     f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
 
-    is_this_invertible = np.linalg.norm(aBack_ref-aFine_ref)
-    #print('Psi is invertible if this is zero: {}'.format(is_this_invertible))
-
-    if is_this_invertible > 0.00001:
-        print('.'.format(is_this_invertible), end='')
-        return create_psi_function(eps_range)   ## make sure that it works
-    else:
-        print('Psi is invertible')
-        return psi, cq1, epsilonT
+    return psi
 
 def computeKmsij(TInd):
     patch = Patch(world, k, TInd)
@@ -186,9 +165,12 @@ def computeKmsij(TInd):
 def computeIndicators(TInd):
     aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref)
     rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_trans)
-
+    #print(np.max(aFine_trans))
     #epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
     epsCoarse = 0
+    if np.isinf(np.max(csiT[TInd].muTPrime)):
+        print(TInd, csiT[TInd].muTPrime)
+
     epsFine = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
     return epsFine, epsCoarse
 
@@ -233,30 +215,29 @@ def Monte_Carlo_recomputations(psi):
     return epsFine_dom_mapping, epsFine_classic
 
 print('start to compute offline stage')
-ROOT = '../results/moving_stripes/'
+ROOT = '../results/local_bending_dots/'
 
 
 
 eps_ranges = [0]
 MC = 1
-NList = [32]
+NList = [N]
 kList = [2]
 
 for eps_range in eps_ranges:
     for m in range(MC):
         # print('________________ step {} ______________'.format(m), end='')
-        psi, _, epsilon = create_psi_function(eps_range)
+        psi = create_psi_function()
         plt.figure("Coefficient")
         drawCoefficient_origin(NFine, aFine_ref)
 
         plt.figure("a_perturbed")
         drawCoefficient_origin(NFine, aFine_pert)
-
         plt.show()
         for k in kList:
             for N in NList:
                 print('precomputing for k {} and N {}  ...... '.format(k, N))
-                TOL = 200
+                TOL = 100
                 TOLt = []
                 to_be_updatedT_DM = []
                 to_be_updatedT_CL = []
@@ -308,9 +289,9 @@ for eps_range in eps_ranges:
                 eps_size = np.size(epsFine_DM)
                 epsFine_DM = {i: epsFine_DM[i] for i in range(np.size(epsFine_DM)) if epsFine_DM[i] > 0}
                 epsFine_CL = {i: epsFine_CL[i] for i in range(np.size(epsFine_CL)) if epsFine_CL[i] > 0}
+
                 full_percentage = len(epsFine_DM) / eps_size
                 print(full_percentage * 100)
-
 
                 print('Starting Algorithm ...... ')
 
@@ -332,7 +313,7 @@ for eps_range in eps_ranges:
                         if eps >= TOL:
                             Elements_to_be_updated_CL.append(i)
                     to_be_updated_CL = np.size(Elements_to_be_updated_CL) / len(epsFine_CL) * 100
-                    to_be_updatedT_CL.append(to_be_updated_CL* full_percentage)
+                    to_be_updatedT_CL.append(to_be_updated_CL * full_percentage)
 
                     ## update domain mapping
                     if np.size(Elements_to_be_updated_DM) is not 0:
@@ -353,7 +334,7 @@ for eps_range in eps_ranges:
                                 continue
                             else:
                                 print('     skipping TOL {}'.format(TOL))
-                                TOL *= 3/4.
+                                TOL*=2./4
                                 continue
 
                     #print('replace Kmsij and update correctorsListT')
@@ -405,17 +386,17 @@ for eps_range in eps_ranges:
                     energy_errorT.append(energy_error)
                     tmp_errorT.append(tmp_energy_error)
                     if tmp_energy_error > 0.0001:
-                        TOL *= 3/4.
+                        TOL *= 2./4
                     else:
                         if int(np.size(already_updated) / len(epsFine_DM)) == 1:
                             if np.size(Elements_to_be_updated_DM) is not 0:
                                 print('     stop computing')
                                 continue_computing = 0
 
-                plt.figure('average epsilon = ' + str(eps_range))
-                plt.title('average' + str(eps_range))
-                plt.semilogx(TOLt, to_be_updatedT_DM, label='domain mapping')
-                plt.legend()
+                #plt.figure('average epsilon = ' + str(eps_range))
+                #plt.title('average' + str(eps_range))
+                #plt.semilogx(TOLt, to_be_updatedT_DM, label='domain mapping')
+                #plt.legend()
                 with open('{}/{}_k{}_H{}_DM.txt'.format(ROOT,eps_range, k, N), 'w') as csvfile:
                     writer = csv.writer(csvfile)
                     for val in to_be_updatedT_DM:

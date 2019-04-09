@@ -1,0 +1,51 @@
+the size of a fine element is 0.001953125
+start to compute offline stage
+Those are the results of the shift epsilon [0, 0, 0, 0.0390625, 0, 0]
+Psi is invertible
+precomputing for k 2 and N 32  ...... 
+compute reference correctors
+compute error indicators
+Fine fem result: Energy norm 0.4815222893506912, error 0.004353912571287831, rel. error 0.009041975143370549
+k: 2, N: 32
+Affected correctors 28.125 %
+Starting Algorithm ...... 
+          TOL: 200, updates: 0.0%, energy error: 0.04934449601058642, tmp_error:0.0
+     skipping TOL 200
+     skipping TOL 150.0
+     skipping TOL 112.5
+     skipping TOL 84.375
+     skipping TOL 63.28125
+     skipping TOL 47.4609375
+     skipping TOL 35.595703125
+     skipping TOL 26.69677734375
+     skipping TOL 20.0225830078125
+     skipping TOL 15.016937255859375
+     skipping TOL 11.262702941894531
+     skipping TOL 8.447027206420898
+     skipping TOL 6.335270404815674
+          TOL: 4.751452803611755, updates: 2.5390624999999996%, energy error: 0.03974083741114793, tmp_error:0.029685084443667704
+          TOL: 3.5635896027088165, updates: 6.25%, energy error: 0.023242324605491266, tmp_error:0.03532675354285438
+     skipping TOL 2.6726922020316124
+     skipping TOL 2.0045191515237093
+     skipping TOL 1.503389363642782
+     skipping TOL 1.1275420227320865
+          TOL: 0.8456565170490649, updates: 8.984375%, energy error: 0.01928737797659722, tmp_error:0.01842638698517672
+          TOL: 0.6342423877867986, updates: 12.5%, energy error: 0.008427192870302753, tmp_error:0.01726499747095174
+     skipping TOL 0.475681790840099
+          TOL: 0.35676134313007424, updates: 15.625%, energy error: 0.007666080745008863, tmp_error:0.003683881033403023
+          TOL: 0.2675710073475557, updates: 18.749999999999996%, energy error: 0.007437174394077282, tmp_error:0.0015229993381340727
+     skipping TOL 0.20067825551066676
+     skipping TOL 0.15050869163300007
+          TOL: 0.11288151872475005, updates: 21.875000000000004%, energy error: 0.007367666456120733, tmp_error:0.00040917335953724474
+     skipping TOL 0.08466113904356254
+     skipping TOL 0.0634958542826719
+     skipping TOL 0.04762189071200393
+     skipping TOL 0.035716418034002946
+          TOL: 0.02678731352550221, updates: 24.8046875%, energy error: 0.007362138263866352, tmp_error:0.000537195220170022
+          TOL: 0.02009048514412666, updates: 25.0%, energy error: 0.007354179585260174, tmp_error:0.00033490969306820275
+     skipping TOL 0.015067863858094995
+     skipping TOL 0.011300897893571245
+          TOL: 0.008475673420178433, updates: 27.9296875%, energy error: 0.007354509775383538, tmp_error:6.984423777798135e-05
+     skipping TOL 0.008475673420178433
+          TOL: 0.006356755065133825, updates: 28.125%, energy error: 0.007356120441064145, tmp_error:3.2766355297000735e-05
+     stop computing
