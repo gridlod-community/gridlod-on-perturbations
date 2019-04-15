@@ -12,10 +12,17 @@ from gridlod.world import World, Patch
 
 from MasterthesisLOD import buildcoef2d
 from gridlod_on_perturbations import discrete_mapping
-from gridlod_on_perturbations.visualization_tools import d3sol, drawCoefficient_origin
-from MasterthesisLOD.visualize import drawCoefficientGrid, drawCoefficient
+from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin
+from MasterthesisLOD.visualize import drawCoefficientGrid
 import csv
-factor = 2**1
+
+import ipyparallel as ipp
+
+client = ipp.Client(sshserver='local')
+client[:].use_cloudpickle()
+view = client.load_balanced_view()
+
+factor = 2**0
 fine = 256 * factor
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
@@ -46,25 +53,6 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         ChannelVertical     = True,
                         BoundarySpace       = True)
 
-# CoefClassRhs = buildcoef2d.Coefficient2d(NFine+1,
-#                         bg                  = 0.,
-#                         val                 = val,
-#                         length              = 1,
-#                         thick               = thick+2,
-#                         space               = space,
-#                         probfactor          = 1,
-#                         right               = 1,
-#                         down                = 0,
-#                         diagr1              = 0,
-#                         diagr2              = 0,
-#                         diagl1              = 0,
-#                         diagl2              = 0,
-#                         LenSwitch           = None,
-#                         thickSwitch         = None,
-#                         equidistant         = True,
-#                         ChannelHorizontal   = None,
-#                         ChannelVertical     = True,
-#                         BoundarySpace       = True)
 
 #global variables
 global aFine_ref
@@ -81,12 +69,6 @@ aFine_ref_shaped = CoefClass.SpecificMove(Number=np.arange(0,10), steps=4, Right
 aFine_ref = aFine_ref_shaped.flatten()
 number_of_channels = len(CoefClass.ShapeRemember)
 
-f_pert = np.ones(NpFine)
-#f_pert = np.block([[np.zeros((fine,1)), aFine_ref_shaped], [np.zeros((1,fine+1))]]).flatten()
-
-# f_pert = CoefClassRhs.BuildCoefficient().flatten()
-# plt.figure('localized right hand side')
-# drawCoefficient_origin(NFine+1, f_pert)
 
 # Discrete mapping
 Nmapping = np.array([int(fine),int(fine)])
@@ -106,13 +88,14 @@ ref_array = aFine_ref_shaped[0]
 
 def create_psi_function(eps_range_in):
     global aFine_pert
-    global f_trans
     epsilonT = []
     cq1 = np.zeros((int(fine) + 1, int(fine) + 1))
 
     cs = np.random.randint(0,2,number_of_channels)
     cs = [c * random.sample([-1,1],1)[0] for c in cs]
-    cs[3] = 20
+
+    # this time manually
+    cs[3] = 10
     cs[4] = 2
     cs[5] = 1
 
@@ -154,7 +137,7 @@ def create_psi_function(eps_range_in):
     plt.legend()
     plt.show()
 
-    print('Those are the results of the shift epsilon', epsilonT)
+    print('These are the results of the shift epsilon', epsilonT)
     cq1 = cq1.flatten()
 
     alpha = 1.
@@ -166,14 +149,9 @@ def create_psi_function(eps_range_in):
 
     xtFine_pert = psi.evaluate(xtFine)
     xtFine_ref = psi.inverse_evaluate(xtFine)
-    xpFine_pert = psi.evaluate(xpFine)
-    xpFine_ref = psi.inverse_evaluate(xpFine)
 
     aFine_pert = func.evaluateDQ0(NFine, aFine_ref, xtFine_ref)
     aBack_ref = func.evaluateDQ0(NFine, aFine_pert, xtFine_pert)
-
-    f_ref = func.evaluateCQ1(NFine, f_pert, xpFine_pert)
-    f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
 
     is_this_invertible = np.linalg.norm(aBack_ref-aFine_ref)
     #print('Psi is invertible if this is zero: {}'.format(is_this_invertible))
@@ -185,6 +163,9 @@ def create_psi_function(eps_range_in):
         print('Psi is invertible')
         return psi, cq1, epsilonT
 
+
+# Functions
+
 def computeKmsij(TInd):
     patch = Patch(world, k, TInd)
     IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
@@ -194,24 +175,30 @@ def computeKmsij(TInd):
     csi = lod.computeBasisCoarseQuantities(patch, correctorsList, aPatch)
     return patch, correctorsList, csi.Kmsij, csi
 
+def computeRhsij(TInd):
+    patch = Patch(world, k, TInd)
+    IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
+    aPatch = lambda: coef.localizeCoefficient(patch, aFine_ref)
+    MPatch = coef.localizeCoefficient(patch, Mrhs)
+
+    correctorsRhsList = lod.computeElementCorrector(patch, IPatch, aPatch, None, MPatch)
+    csi = lod.computeBasisCoarseQuantities(patch, correctorsRhsList, aPatch, rhs = True)
+    return patch, correctorsRhsList, csi.Kmsij, csi
+
 def computeIndicators(TInd):
     aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref)
     rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_trans)
 
-    #epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
-    epsCoarse = 0
-    epsFine = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
-    return epsFine, epsCoarse
+    epsCoarse = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
+    return epsCoarse, 0
 
 def computeIndicators_classic(TInd):
     global aFine_pert
     aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref_shaped.flatten())
     rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_pert)
 
-    #epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
-    epsCoarse = 0
-    epsFine = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
-    return epsFine, epsCoarse
+    epsCoarse = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
+    return epsCoarse, 0
 
 def UpdateCorrectors(TInd):
     patch = Patch(world, k, TInd)
@@ -238,16 +225,19 @@ def Monte_Carlo_recomputations(psi):
     Aeye = np.tile(np.eye(2), [np.prod(NFine), 1, 1])
     aFine_ref = np.einsum('tji, t-> tji', Aeye, aFine_ref)
 
-    epsFine_dom_mapping, epsCoarse = zip(*map(computeIndicators, range(world.NtCoarse)))
-    epsFine_classic, epsCoarse = zip(*map(computeIndicators_classic, range(world.NtCoarse)))
+    epsCoarse_dom_mapping, _ = zip(*map(computeIndicators, range(world.NtCoarse)))
+    epsCoarse_CLassic, _ = zip(*map(computeIndicators_classic, range(world.NtCoarse)))
 
-    return epsFine_dom_mapping, epsFine_classic
+    return epsCoarse_dom_mapping, epsCoarse_CLassic
+
+
+#### MAIN PROGRAM
 
 print('start to compute offline stage')
 ROOT = '../results/moving_stripes/'
 
 
-
+# This is useful for MC. For now we set MC = 1 which means only one MC computation
 eps_ranges = [0]
 MC = 1
 NList = [32]
@@ -256,7 +246,10 @@ kList = [2]
 for eps_range in eps_ranges:
     for m in range(MC):
         # print('________________ step {} ______________'.format(m), end='')
+        
+        # construct psi 
         psi, _, epsilon = create_psi_function(eps_range)
+        
         plt.figure("Coefficient")
         drawCoefficient_origin(NFine, aFine_ref)
 
@@ -264,6 +257,7 @@ for eps_range in eps_ranges:
         drawCoefficient_origin(NFine, aFine_pert)
 
         plt.show()
+        
         for k in kList:
             for N in NList:
                 print('precomputing for k {} and N {}  ...... '.format(k, N))
@@ -285,19 +279,67 @@ for eps_range in eps_ranges:
                 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 
                 print('compute error indicators')
-                epsFine_DM, epsFine_CL = Monte_Carlo_recomputations(psi)
+                epsCoarse_DM, epsCoarse_CL = Monte_Carlo_recomputations(psi)
                 already_updated = []
 
                 fig = plt.figure("error indicator k {} and N {}".format(k, N))
                 ax = fig.add_subplot(1, 1, 1)
                 ax.set_title("error indicator k {} and N {}".format(k, N))
-                np_eps = np.einsum('i,i -> i', np.ones(np.size(epsFine_DM)), epsFine_DM)
+                np_eps = np.einsum('i,i -> i', np.ones(np.size(epsCoarse_DM)), epsCoarse_DM)
                 drawCoefficientGrid(NWorldCoarse, np_eps, fig, ax, original_style=True)
 
                 with open('{}/{}_k{}_H{}_eps_fine.txt'.format(ROOT, eps_range, k, N), 'w') as csvfile:
                     writer = csv.writer(csvfile)
-                    for val in epsFine_DM:
+                    for val in epsCoarse_DM:
                         writer.writerow([val])
+
+                xpFine_pert = psi.evaluate(xpFine)
+                xpFine_ref = psi.inverse_evaluate(xpFine)
+                
+                # Now we localize f dependent on epsilon
+                f_cheat = np.ones(np.prod(NWorldCoarse)) * bg
+                worst_coarse_elements = []
+
+                for i, eps in enumerate(epsCoarse_DM):
+                    if eps >= 1.5:
+                        worst_coarse_elements.append(i)
+
+                for i in worst_coarse_elements:
+                    f_cheat[i+1] = 1000.
+
+                plt.figure('check coarse f')
+                drawCoefficient_origin(NWorldCoarse, f_cheat)
+                plt.show()
+
+                f_cheat = f_cheat.reshape(N,N)
+                f_cheat = np.append(f_cheat, np.ones((N, 1)) * bg, 1)
+                f_row = np.ones((1,N+1))
+                f_row[0] = f_cheat[0,:]
+                f_cheat = np.append(f_cheat, f_row, 0)
+                f_cheat = f_cheat.flatten()
+
+                basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
+                f_cheat = basis * f_cheat
+
+                plt.figure('check fine f')
+                drawCoefficient_origin(NFine+1, f_cheat)
+                plt.show()
+
+                f_ref = f_cheat
+                f_pert = func.evaluateCQ1(NFine, f_ref, xpFine_ref)
+
+                f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
+
+                Mrhs = f_trans
+
+                print('compute right hand side correctors')
+                #patchT, correctorsListRhsT, RhsijT, csiT = zip(*map(computeRhsij, range(world.NtCoarse)))
+
+                # OLD f
+                # f_pert = np.ones(NpFine)
+                # f_ref = func.evaluateCQ1(NFine, f_pert, xpFine_pert)
+                # f_pert = func.evaluateCQ1(NFine, f_ref, xpFine_ref)
+                # f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
 
                 uFineFull_pert, AFine_pert, _ = femsolver.solveFine(world, aFine_pert, f_pert, None, boundaryConditions)
                 uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_trans, None,
@@ -316,33 +358,32 @@ for eps_range in eps_ranges:
                 uFineFull_pert, AFine_pert = uFineFull_trans, AFine_trans
                 init = 1
 
-                eps_size = np.size(epsFine_DM)
-                epsFine_DM = {i: epsFine_DM[i] for i in range(np.size(epsFine_DM)) if epsFine_DM[i] > 0}
-                epsFine_CL = {i: epsFine_CL[i] for i in range(np.size(epsFine_CL)) if epsFine_CL[i] > 0}
-                full_percentage = len(epsFine_DM) / eps_size
+                eps_size = np.size(epsCoarse_DM)
+                epsCoarse_DM = {i: epsCoarse_DM[i] for i in range(np.size(epsCoarse_DM)) if epsCoarse_DM[i] > 0}
+                epsCoarse_CL = {i: epsCoarse_CL[i] for i in range(np.size(epsCoarse_CL)) if epsCoarse_CL[i] > 0}
+                full_percentage = len(epsCoarse_DM) / eps_size
                 print(full_percentage * 100)
 
 
                 print('Starting Algorithm ...... ')
 
-                #print('length of epsFine ', len(epsFine_DM))
                 continue_computing = 1
                 while continue_computing:
                     TOLt.append(TOL)
                     Elements_to_be_updated_DM = []
                     Elements_to_be_updated_CL = []
-                    for (i,eps) in epsFine_DM.items():
+                    for (i,eps) in epsCoarse_DM.items():
                         if eps >= TOL:
                             if i not in already_updated:
                                 already_updated.append(i)
                                 Elements_to_be_updated_DM.append(i)
 
-                    to_be_updated_DM = np.size(already_updated) / len(epsFine_DM) * 100
+                    to_be_updated_DM = np.size(already_updated) / len(epsCoarse_DM) * 100
                     to_be_updatedT_DM.append(to_be_updated_DM* full_percentage)
-                    for (i, eps) in epsFine_CL.items():
+                    for (i, eps) in epsCoarse_CL.items():
                         if eps >= TOL:
                             Elements_to_be_updated_CL.append(i)
-                    to_be_updated_CL = np.size(Elements_to_be_updated_CL) / len(epsFine_CL) * 100
+                    to_be_updated_CL = np.size(Elements_to_be_updated_CL) / len(epsCoarse_CL) * 100
                     to_be_updatedT_CL.append(to_be_updated_CL* full_percentage)
 
                     ## update domain mapping
@@ -358,7 +399,7 @@ for eps_range in eps_ranges:
                         else:
                             energy_errorT.append(energy_error)
                             tmp_errorT.append(old_tmp_energy_error)
-                            if np.size(already_updated) / len(epsFine_DM)==1:
+                            if np.size(already_updated) / len(epsCoarse_DM)==1:
                                 print('     every corrector has been updated')
                                 continue_computing = 0
                                 continue
@@ -380,21 +421,28 @@ for eps_range in eps_ranges:
                     KmsijT = tuple(KmsijT_list)
                     correctorsListT = tuple(correctorsListT_list)
 
-                    #print('Norm of the matrizes {}'.format(np.linalg.norm(KmsijT-KmsijT_original)))
                     KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
 
+                    RFull = 0
+                    # RFull = pglod.assembleMsStiffnessMatrix(world, patchT, RhsijT)
+
                     MFull = fem.assemblePatchMatrix(NFine, world.MLocFine)
+
+                    bFull = MFull * f_trans - RFull * f_trans
 
                     basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
                     basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
                     modifiedBasis = basis - basisCorrectors
 
-                    bFull = MFull * f_trans
+
                     bFull = basis.T * bFull
 
                     uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
 
                     uLodFine = modifiedBasis * uFull
+
+                    ### TODO
+                    # uLodFine += pglod.computeCorrection(correctorsListRhsT)
 
                     uFineFull_trans_pert = uLodFine
 
@@ -418,7 +466,7 @@ for eps_range in eps_ranges:
                     if tmp_energy_error > 0.0001:
                         TOL *= 3/4.
                     else:
-                        if int(np.size(already_updated) / len(epsFine_DM)) == 1:
+                        if int(np.size(already_updated) / len(epsCoarse_DM)) == 1:
                             if np.size(Elements_to_be_updated_DM) is not 0:
                                 print('     stop computing')
                                 continue_computing = 0
