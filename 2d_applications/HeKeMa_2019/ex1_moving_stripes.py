@@ -175,15 +175,18 @@ def computeKmsij(TInd):
     csi = lod.computeBasisCoarseQuantities(patch, correctorsList, aPatch)
     return patch, correctorsList, csi.Kmsij, csi
 
-def computeRhsij(TInd):
+def computeRmsi(TInd):
     patch = Patch(world, k, TInd)
     IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
     aPatch = lambda: coef.localizeCoefficient(patch, aFine_ref)
-    MPatch = coef.localizeCoefficient(patch, Mrhs)
+    MRhsList = [Mrhs[util.extractElementFine(world.NWorldCoarse,
+                                             world.NCoarseElement,
+                                             patch.iElementWorldCoarse,
+                                             extractElements=False)]];
 
-    correctorsRhsList = lod.computeElementCorrector(patch, IPatch, aPatch, None, MPatch)
-    csi = lod.computeBasisCoarseQuantities(patch, correctorsRhsList, aPatch, rhs = True)
-    return patch, correctorsRhsList, csi.Kmsij, csi
+    correctorRhs = lod.computeElementCorrector(patch, IPatch, aPatch, None, MRhsList)[0]
+    Rmsi = lod.computeRhsCoarseQuantities(patch, correctorRhs, aPatch)
+    return patch, correctorRhs, Rmsi
 
 def computeIndicators(TInd):
     aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref)
@@ -333,7 +336,7 @@ for eps_range in eps_ranges:
                 Mrhs = f_trans
 
                 print('compute right hand side correctors')
-                #patchT, correctorsListRhsT, RhsijT, csiT = zip(*map(computeRhsij, range(world.NtCoarse)))
+                patchT, correctorRhsT, RmsiT = zip(*map(computeRmsi, range(world.NtCoarse)))
 
                 # OLD f
                 # f_pert = np.ones(NpFine)
@@ -422,27 +425,19 @@ for eps_range in eps_ranges:
                     correctorsListT = tuple(correctorsListT_list)
 
                     KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
-
-                    RFull = 0
-                    # RFull = pglod.assembleMsStiffnessMatrix(world, patchT, RhsijT)
-
+                    RFull = pglod.assemblePatchFunction(world, patchT, RmsiT)
                     MFull = fem.assemblePatchMatrix(NFine, world.MLocFine)
 
-                    bFull = MFull * f_trans - RFull * f_trans
+                    bFull = basis.T * MFull * f_trans - RFull
 
                     basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
                     basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
                     modifiedBasis = basis - basisCorrectors
 
-
-                    bFull = basis.T * bFull
-
                     uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
 
                     uLodFine = modifiedBasis * uFull
-
-                    ### TODO
-                    # uLodFine += pglod.computeCorrection(correctorsListRhsT)
+                    uLodFine += pglod.assemblePatchFunction(world, patchT, correctorRhsT)
 
                     uFineFull_trans_pert = uLodFine
 
