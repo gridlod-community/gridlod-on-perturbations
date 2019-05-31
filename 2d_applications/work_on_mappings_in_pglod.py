@@ -46,7 +46,7 @@ xpFine_ref = psi.inverse_evaluate(xpFine)
 xtFine_pert = psi.evaluate(xtFine)
 xtFine_ref = psi.inverse_evaluate(xtFine)
 
-bg = 0.01 		#background
+bg = 0.1 		#background
 val = 1			#values
 
 CoefClass = buildcoef2d.Coefficient2d(NCoeff,
@@ -164,10 +164,8 @@ def computeIndicators(TInd):
     aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref)
     rPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_trans)
 
-    epsFine = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
-    epsCoarse = 0
-    #epsCoarse = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
-    return epsFine, epsCoarse
+    epsCoarse = lod.computeBasisErrorIndicatorFine(patchT[TInd], correctorsListT[TInd], aPatch, rPatch)
+    return epsCoarse
 
 def UpdateCorrectors(TInd):
     patch = Patch(world, k, TInd)
@@ -183,34 +181,46 @@ def UpdateCorrectors(TInd):
 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 
 print('compute error indicators')
-epsFine, epsCoarse = zip(*map(computeIndicators, range(world.NtCoarse)))
+epsCoarse = list(map(computeIndicators, range(world.NtCoarse)))
 
 fig = plt.figure("error indicator")
 ax = fig.add_subplot(1,1,1)
-np_eps = np.einsum('i,i -> i', np.ones(np.size(epsFine)), epsFine)
+np_eps = np.einsum('i,i -> i', np.ones(np.size(epsCoarse)), epsCoarse)
 drawCoefficientGrid(NWorldCoarse, np_eps,fig,ax, original_style=True)
 
 print('apply tolerance')
 Elements_to_be_updated = []
 for i in range(world.NtCoarse):
-    if epsFine[i] >= 0.01:
+    if epsCoarse[i] >= 0.01:
         Elements_to_be_updated.append(i)
-print('.... to be updated: {}'.format(np.size(Elements_to_be_updated)/np.size(epsFine)))
+print('... to be updated: {}'.format(np.size(Elements_to_be_updated)/np.size(epsCoarse)), end='', flush=True)
 
-print('update correctors')
-patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(UpdateCorrectors, Elements_to_be_updated))
+if np.size(Elements_to_be_updated) != 0:
+    print('... update correctors')
+    patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(UpdateCorrectors, Elements_to_be_updated))
 
-print('replace Kmsij and update correctorsListT')
-KmsijT_list = list(KmsijT)
-correctorsListT_list = list(correctorsListT)
-i=0
-for T in Elements_to_be_updated:
-    KmsijT_list[T] = KmsijTNew[i]
-    correctorsListT_list[T] = correctorsListTNew[i]
-    i+=1
+    print('replace Kmsij and update correctorsListT')
+    KmsijT_list = list(KmsijT)
+    correctorsListT_list = list(correctorsListT)
+    i=0
+    for T in Elements_to_be_updated:
+        KmsijT_list[T] = KmsijTNew[i]
+        correctorsListT_list[T] = correctorsListTNew[i]
+        i+=1
 
-KmsijT = tuple(KmsijT_list)
-correctorsListT = tuple(correctorsListT_list)
+    KmsijT = tuple(KmsijT_list)
+    correctorsListT = tuple(correctorsListT_list)
+
+    '''
+    Plot error indicator
+    '''
+    fig = plt.figure("error indicator")
+    ax = fig.add_subplot(1, 1, 1)
+    np_eps = np.einsum('i,i -> i', np.ones(np.size(epsCoarse)), epsCoarse)
+    drawCoefficientGrid(NWorldCoarse, np_eps, fig, ax, original_style=True, Gridsize=N)
+else:
+    print('... nothing to be updated')
+
 
 print('solve the system')
 KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
@@ -231,12 +241,11 @@ uLodFine = modifiedBasis * uFull
 fig = plt.figure('new figure')
 ax = fig.add_subplot(121)
 ax.set_title('PGLOD Solution to transformed problem (reference domain)',fontsize=6)
-im = ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
-fig.colorbar(im)
+ax.imshow(np.reshape(uLodFine, NFine+1), origin='lower_left')
+
 ax = fig.add_subplot(122)
 ax.set_title('FEM Solution to transformed problem (reference domain)',fontsize=6)
-im = ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
-fig.colorbar(im)
+ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
 
 newErrorFine = np.sqrt(np.dot(uLodFine - uFineFull_trans, AFine_trans * (uLodFine - uFineFull_trans)))
 
