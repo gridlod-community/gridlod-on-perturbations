@@ -14,15 +14,14 @@ from gridlod_on_perturbations import discrete_mapping
 from gridlod_on_perturbations.visualization_tools import d3sol
 from MasterthesisLOD.visualize import drawCoefficientGrid, drawCoefficient
 
-potenz = 9
-factor = potenz - 7
-fine = 2**potenz
-N = 2**5
+
+fine = 128
+N = 16
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-space = 30 * factor
-thick = 5 * factor
+space = 10
+thick = 1
 
 bg = 0.1		#background
 val = 1			#values
@@ -30,6 +29,7 @@ val = 1			#values
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg                  = bg,
                         val                 = val,
+                        length              = 1,
                         thick               = thick,
                         space               = space,
                         probfactor          = 1,
@@ -49,86 +49,62 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
 
 # Set reference coefficient
 aFine_ref_shaped = CoefClass.BuildCoefficient()
-
-# delete the second stripe that gets too much seperated
-# aFine_ref_shaped = CoefClass.SpecificVanish(Number=[1])
-
 aFine_ref = aFine_ref_shaped.flatten()
+number_of_channels = len(CoefClass.ShapeRemember)
 
-xpFine = util.pCoordinates(NFine)
-xtFine = util.tCoordinates(NFine)
+#I want to know the exact places of the channels
+ref_array = aFine_ref_shaped[0]
+now = 0
+count = 0
+for i in range(np.size(ref_array)):
+    if ref_array[i] == 1:
+        count +=1
+    if count == number_of_channels//2:
+        begin = i+1
+        break
+count = 0
+for i in range(np.size(ref_array)):
+    if ref_array[i] == 1:
+        count +=1
+    if count == number_of_channels//2 + 2:
+        end = i
+        break
+
+# Discrete mapping
+Nmapping = np.array([int(fine),int(fine)])
+cq1 = np.zeros((int(fine)+1,int(fine)+1))
 
 size_of_an_element = 1./fine
-print('the size of a fine element is {}'.format(size_of_an_element))
 walk_with_perturbation = size_of_an_element
 
 channels_position_from_zero = space
 channels_end_from_zero = channels_position_from_zero + thick
 
+left = begin
+right = end
+increasing_length = (end-begin)//2 - thick - 1
+constant_length = (end-begin) - increasing_length * 2
+maximum_walk = (increasing_length-1) * walk_with_perturbation
+walk_with_perturbation = maximum_walk
+for i in range(increasing_length):
+    cq1[:, begin+1+i] = (i+1)/increasing_length * walk_with_perturbation
+    cq1[:, begin + increasing_length + i + constant_length] = walk_with_perturbation - (i+1)/increasing_length * walk_with_perturbation
+
+for i in range(constant_length):
+    cq1[:, begin + increasing_length + i] = walk_with_perturbation
+
+plt.plot(np.arange(0,fine+1),cq1[0,:], label= '$id(x) - \psi(x)$')
+plt.title('Domain mapping')
+plt.legend()
+cq1 = cq1.flatten()
+
 xpFine = util.pCoordinates(NFine)
 xtFine = util.tCoordinates(NFine)
 
-#I want to know the exact places of the channels
-ref_array = aFine_ref_shaped[0]
+alpha = 1.
 
-epsilonT = []
-
-forward_mapping = np.stack([xpFine[:, 0], xpFine[:, 1]], axis=1)
-
-xpFine_shaped = xpFine.reshape(fine + 1, fine + 1, 2)
-left, right = 0, fine + 1
-
-number_of_channels = len(CoefClass.ShapeRemember)
-for c in range(number_of_channels):
-    count = 0
-    for i in range(np.size(ref_array)):
-        if ref_array[i] == 1:
-            count +=1
-        if count == (c+1)*thick:
-            begin = i + 1 - space // 2
-            end = i + 1 + thick+ space // 2
-            break
-    print(begin,end)
-    left_2, right_2 = begin, end
-    if c == 3:
-        epsilon = 30
-    #elif c == 4:
-    #    epsilon = -25
-    #elif c % 2 == 0:
-    #
-    else:
-        epsilon = 0
-        #epsilon = np.random.uniform(-10,10)
-
-    part_x = xpFine_shaped[left:right, left_2:right_2, 0]
-    part_y = xpFine_shaped[left:right, left_2:right_2, 1]
-    left_margin_x = np.min(part_x)
-    right_margin_x = np.max(part_x)
-    left_margin_y = np.min(part_y)
-    right_margin_y = np.max(part_y)
-
-    print(left_margin_x, right_margin_x, left_margin_y, right_margin_y)
-
-    forward_mapping_partial = np.stack([xpFine_shaped[left:right, left_2:right_2, 0]
-                                        + epsilon *
-                                        (xpFine_shaped[left:right, left_2:right_2, 0] - left_margin_x) *
-                                        (right_margin_x - xpFine_shaped[left:right, left_2:right_2, 0]) *
-                                        (xpFine_shaped[left:right, left_2:right_2, 1] - left_margin_y) *
-                                        (right_margin_y - xpFine_shaped[left:right, left_2:right_2, 1]),
-                                        xpFine_shaped[left:right, left_2:right_2, 1]], axis=2)
-
-    forward_mapping_shaped = forward_mapping.reshape(fine + 1, fine + 1, 2)
-    forward_mapping_shaped[left:right, left_2:right_2, :] = forward_mapping_partial
-
-    epsilonT.append(epsilon)
-
-forward_mapping = forward_mapping_shaped.reshape((fine + 1) ** 2, 2)
-
-
-print('Those are the results of the shift epsilon', epsilonT)
-
-psi = discrete_mapping.MappingCQ1(NFine, forward_mapping)
-
+for_mapping = np.stack((xpFine[:,0] + alpha * func.evaluateCQ1(Nmapping, cq1, xpFine), xpFine[:,1]), axis = 1)
+psi = discrete_mapping.MappingCQ1(NFine, for_mapping)
 
 
 # Compute grid points and mapped grid points
