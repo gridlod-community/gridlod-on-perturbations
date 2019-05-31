@@ -16,11 +16,6 @@ from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin
 from MasterthesisLOD.visualize import drawCoefficientGrid
 import csv
 
-import ipyparallel as ipp
-
-client = ipp.Client(sshserver='local')
-client[:].use_cloudpickle()
-view = client.load_balanced_view()
 
 factor = 2**0
 fine = 256 * factor
@@ -54,14 +49,7 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         BoundarySpace       = True)
 
 
-#global variables
-global aFine_ref
-global aFine_trans
-global aFine_pert
-global k
-global KmsijT
-global correctorsListT
-global f_trans
+
 
 # Set reference coefficient
 aFine_ref_shaped = CoefClass.BuildCoefficient()
@@ -94,7 +82,7 @@ def create_psi_function(eps_range_in):
     cs = np.random.randint(0,2,number_of_channels)
     cs = [c * random.sample([-1,1],1)[0] for c in cs]
 
-    # this time manually
+    # or manually
     cs[3] = 10
     cs[4] = 2
     cs[5] = 1
@@ -157,7 +145,7 @@ def create_psi_function(eps_range_in):
     #print('Psi is invertible if this is zero: {}'.format(is_this_invertible))
 
     if is_this_invertible > 0.00001:
-        print('.'.format(is_this_invertible), end='')
+        print('.'.format(is_this_invertible), end='', flush=True)
         return create_psi_function(eps_range)   ## make sure that it works
     else:
         print('Psi is invertible')

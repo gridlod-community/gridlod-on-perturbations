@@ -16,7 +16,7 @@ from gridlod_on_perturbations.visualization_tools import d3sol, drawCoefficient_
 from MasterthesisLOD.visualize import drawCoefficientGrid, drawCoefficient
 import csv
 
-potenz = 9
+potenz = 8
 factor = 2**(potenz - 8)
 fine = 2**potenz
 N = 2**5
@@ -148,8 +148,6 @@ def create_psi_function():
     aFine_pert = func.evaluateDQ0(NFine, aFine_ref, xtFine_ref)
     aBack_ref = func.evaluateDQ0(NFine, aFine_pert, xtFine_pert)
 
-    f_ref = func.evaluateCQ1(NFine, f_pert, xpFine_pert)
-    f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
 
     return psi
 
@@ -268,6 +266,45 @@ for eps_range in eps_ranges:
                     writer = csv.writer(csvfile)
                     for val in epsFine_DM:
                         writer.writerow([val])
+
+                xpFine_pert = psi.evaluate(xpFine)
+                xpFine_ref = psi.inverse_evaluate(xpFine)
+
+                f_cheat = np.ones(np.prod(NWorldCoarse))
+                worst_coarse_elements = []
+
+                for i, eps in enumerate(epsFine_DM):
+                    if eps >= 0.3:
+                        worst_coarse_elements.append(i)
+
+                for i in worst_coarse_elements:
+                    f_cheat[i:i+1] = 100.
+
+                plt.figure('see')
+                drawCoefficient_origin(NWorldCoarse, f_cheat)
+                plt.show()
+
+                f_cheat = f_cheat.reshape(N,N)
+                f_cheat = np.append(f_cheat, np.ones((1, N)) , 0)
+                f_cheat = np.append(f_cheat, np.ones((N + 1, 1)), 1)
+                f_cheat = f_cheat.flatten()
+
+                basis = fem.assembleProlongationMatrix(NWorldCoarse, NCoarseElement)
+                f_cheat = basis * f_cheat
+
+                plt.figure('see one more time')
+                drawCoefficient_origin(NFine+1, f_cheat)
+                plt.show()
+
+                f_ref = f_cheat
+                f_pert = func.evaluateCQ1(NFine, f_ref, xpFine_ref)
+
+                f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
+
+                # f_pert = np.ones(NpFine)
+                # f_ref = func.evaluateCQ1(NFine, f_pert, xpFine_pert)
+                # f_pert = func.evaluateCQ1(NFine, f_ref, xpFine_ref)
+                # f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
 
                 uFineFull_pert, AFine_pert, _ = femsolver.solveFine(world, aFine_pert, f_pert, None, boundaryConditions)
                 uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_trans, None,
