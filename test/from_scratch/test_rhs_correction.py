@@ -1,3 +1,8 @@
+# This file is part of the project for "Localization of multiscale problems with random defects":
+#   https://github.com/gridlod-community/gridlod-on-perturbations.git
+# Copyright holder: Tim Keil, Fredrik Hellmann
+# License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
+
 import numpy as np
 import scipy.sparse as sparse
 import matplotlib.pyplot as plt
@@ -39,40 +44,6 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         ChannelHorizontal   = None,
                         ChannelVertical     = True,
                         BoundarySpace       = True)
-
-# try around with f
-# CoefClass_for_rhs = buildcoef2d.Coefficient2d(NFine,
-#                         bg                  = 0.01,
-#                         val                 = val,
-#                         length              = 8,
-#                         thick               = 8,
-#                         space               = 8,
-#                         probfactor          = 1,
-#                         right               = 1,
-#                         down                = 0,
-#                         diagr1              = 0,
-#                         diagr2              = 0,
-#                         diagl1              = 0,
-#                         diagl2              = 0,
-#                         LenSwitch           = None,
-#                         thickSwitch         = None,
-#                         equidistant         = True,
-#                         ChannelHorizontal   = None,
-#                         ChannelVertical     = None,
-#                         BoundarySpace       = True)
-#
-#
-# f_cheat = CoefClass_for_rhs.BuildCoefficient().flatten() *10.
-# f_cheat = f_cheat.reshape(fine, fine)
-# f_cheat = np.append(f_cheat, np.ones((fine, 1)) * bg, 1)
-# f_row = np.ones((1, fine + 1))
-# f_row[0] = f_cheat[0, :]
-# f_cheat = np.append(f_cheat, f_row, 0)
-# f_cheat = f_cheat.flatten()
-
-# plt.figure('check fine f')
-# drawCoefficient_origin(NFine + 1, f_cheat)
-# plt.show()
 
 
 aFine = CoefClass.BuildCoefficient().flatten()

@@ -4,38 +4,48 @@
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
 import numpy as np
-import random
 import matplotlib.pyplot as plt
 
-from gridlod import util, femsolver, func, interp, coef, fem, lod, pglod
+from gridlod import util, femsolver, interp, coef, fem, lod, pglod
 from gridlod.world import World, Patch
 
 from MasterthesisLOD import buildcoef2d
-from gridlod_on_perturbations import discrete_mapping
-from gridlod_on_perturbations.visualization_tools import d3sol, drawCoefficient_origin
-from MasterthesisLOD.visualize import drawCoefficientGrid, drawCoefficient
-import csv
+from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin
+from MasterthesisLOD.visualize import drawCoefficientGrid
+
+from perturbations import BendingInOneArea
 
 # Set global variables for the computation
 
-potenz = 8
-factor = 2**(potenz - 8)
-fine = 2**potenz
-N = 2**3
+power = 8
+fine = 2**power
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
+# This factor enables that A does not change for finer fine mesh
+factor = 2**(power - 8)
+
+# Coarse mesh
+N = 2**3
 NWorldCoarse = np.array([N, N])
-boundaryConditions = np.array([[0, 0], [0, 0]])
+
+# boundary Conditions
+boundaryConditions = np.array([[0, 0], [0, 1]])
+
 NCoarseElement = NFine // NWorldCoarse
 world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 
-# Construct diffusion coefficient
-space = 10 * factor
-thick = 5 * factor
+
+'''
+diffusion coefficient
+'''
+
+space = int(12 * factor)
+thick = int(4 * factor)
 bg = 0.1		#background
 val = 1			#values
 
+# See my master thesis Chapter 7 for detailed explanation on buildcoef2d
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg                  = bg,
                         val                 = val,
@@ -53,15 +63,38 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         thickSwitch         = None,
                         equidistant         = True,
                         ChannelHorizontal   = None,
-                        ChannelVertical     = None,
+                        ChannelVertical     = True,  # SET THIS TO TRUE TO GET CHANNELS
                         BoundarySpace       = True)
 
 # Set reference coefficient
 aFine_ref = CoefClass.BuildCoefficient().flatten()
 
-number_on_one_axis = int(np.sqrt(np.shape(CoefClass.ShapeRemember)[0])/3)
-numbers = [i+k + i * number_on_one_axis*3 for k in range(number_on_one_axis) for i in range(number_on_one_axis)]
-aFine_pert = CoefClass.SpecificValueChange(Number = numbers, ratio=100).flatten()
+'''
+Perturbation using buildcoef2d
+'''
+
+# Get information from CoefClass to know the number of squares
+squares_on_ones_axis = np.sqrt(np.shape(CoefClass.ShapeRemember)[0])
+number_on_one_axis = int(squares_on_ones_axis/3)
+
+offset = 0    #starting point
+offset = squares_on_ones_axis * (number_on_one_axis +1) + number_on_one_axis + 1
+
+numbers = [i+k + i * (number_on_one_axis*3 +1) + offset for k in range(number_on_one_axis) for i in range(number_on_one_axis)]
+
+# either Disappearance or Change in Value
+aFine_pert = CoefClass.SpecificVanish(Number = numbers).flatten()
+aFine_pert = CoefClass.SpecificValueChange(Number = numbers, ratio = 100.).flatten()
+
+'''
+Domain mapping perturbation
+'''
+
+# psi = create_bending_perturbation(world)
+# aFine_pert = compute_perturbation(world, psi, aFine_ref)
+
+bending_perturbation = BendingInOneArea(world, bending_factor=5)
+aFine_pert = bending_perturbation.compute_perturbation(aFine_ref)
 
 '''
 Plot diffusion coefficient
@@ -76,10 +109,15 @@ fig = plt.figure("Coefficient with grid")
 ax = fig.add_subplot(1, 1, 1)
 drawCoefficientGrid(NFine, aFine_ref, fig, ax, original_style=True, Gridsize = N)
 
-# right hand side
-f_ref = np.ones(NpFine) * 0.001
+'''
+Construct right hand side
+'''
+
+f_ref = np.ones(NpFine) * 0.01
 f_ref_reshaped = f_ref.reshape(NFine+1)
-f_ref_reshaped[int(0*fine/8):int(4*fine/8),int(0*fine/8):int(4*fine/8)] = 1
+f_ref_reshaped[int(0*fine/8):int(2*fine/8),int(0*fine/8):int(2*fine/8)] = 1
+# f_ref_reshaped[int(6*fine/8):int(8*fine/8),int(6*fine/8):int(8*fine/8)] = 1
+# f_ref_reshaped[int(3*fine/8):int(5*fine/8),int(3*fine/8):int(5*fine/8)] = 1
 f_ref = f_ref_reshaped.reshape(NpFine)
 
 '''
@@ -88,20 +126,24 @@ Plot right hand side
 plt.figure('Right hand side')
 drawCoefficient_origin(NFine+1, f_ref)
 
+'''
+Set the coefficient that we want to approximate
+'''
+
 a_Fine_to_be_approximated = aFine_ref
 a_Fine_to_be_approximated = aFine_pert
+
+tol = 100
 
 '''
 Compute FEM
 '''
 uFineFull_ref, AFine_ref, _ = femsolver.solveFine(world, a_Fine_to_be_approximated, f_ref, None, boundaryConditions)
 
-
-
 '''
 Compute PGLOD 
 '''
-k = 2
+k = 3
 
 def computeKmsij(TInd):
     patch = Patch(world, k, TInd)
@@ -141,49 +183,58 @@ def UpdateCorrectors(TInd):
     csi = lod.computeBasisCoarseQuantities(patch, correctorsList, rPatch)
     return patch, correctorsList, csi.Kmsij, csi
 
+def UpdateElements(epsCoarse, tol, KmsijT, correctorsListT):
+    print('apply tolerance')
+    Elements_to_be_updated = []
+    for i in range(world.NtCoarse):
+        if epsCoarse[i] > tol:
+            Elements_to_be_updated.append(i)
+    print('... to be updated: {}'.format(np.size(Elements_to_be_updated) / np.size(epsCoarse)), end='', flush=True)
+
+    if np.size(Elements_to_be_updated) != 0:
+        print('... update correctors')
+        patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(UpdateCorrectors, Elements_to_be_updated))
+
+        print('replace Kmsij and update correctorsListT')
+        KmsijT_list = list(KmsijT)
+        correctorsListT_list = list(correctorsListT)
+        i = 0
+        for T in Elements_to_be_updated:
+            KmsijT_list[T] = KmsijTNew[i]
+            correctorsListT_list[T] = correctorsListTNew[i]
+            i += 1
+
+        KmsijT = tuple(KmsijT_list)
+        correctorsListT = tuple(correctorsListT_list)
+
+        return KmsijT, correctorsListT
+    else:
+        print('... there is nothing to be updated')
+        return KmsijT, correctorsListT
+
 
 # Use mapper to distribute computations (mapper could be the 'map' built-in or e.g. an ipyparallel map)
-print('compute KmsijT for all T')
+print('compute Kmsij and Rmsi for all T')
 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 patchT, correctorRhsT, RmsiT = zip(*map(computeRmsi, range(world.NtCoarse)))
 
 print('compute error indicators')
 epsCoarse = list(map(computeIndicators, range(world.NtCoarse)))
 
+'''
+Plot error indicator
+'''
+fig = plt.figure("error indicator")
+ax = fig.add_subplot(1, 1, 1)
+np_eps = np.einsum('i,i -> i', np.ones(np.size(epsCoarse)), epsCoarse)
+drawCoefficientGrid(NWorldCoarse, np_eps, fig, ax, original_style=True, Gridsize=N)
 
-print('apply tolerance')
-Elements_to_be_updated = []
-for i in range(world.NtCoarse):
-    if epsCoarse[i] > 110:
-        Elements_to_be_updated.append(i)
-print('... to be updated: {}'.format(np.size(Elements_to_be_updated)/np.size(epsCoarse)), end='', flush=True)
 
-if np.size(Elements_to_be_updated) != 0:
-    print('... update correctors')
-    patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(UpdateCorrectors, Elements_to_be_updated))
+KmsijT, correctorsListT = UpdateElements(epsCoarse, tol, KmsijT, correctorsListT)
 
-    print('replace Kmsij and update correctorsListT')
-    KmsijT_list = list(KmsijT)
-    correctorsListT_list = list(correctorsListT)
-    i=0
-    for T in Elements_to_be_updated:
-        KmsijT_list[T] = KmsijTNew[i]
-        correctorsListT_list[T] = correctorsListTNew[i]
-        i+=1
-
-    KmsijT = tuple(KmsijT_list)
-    correctorsListT = tuple(correctorsListT_list)
-
-    '''
-    Plot error indicator
-    '''
-    fig = plt.figure("error indicator")
-    ax = fig.add_subplot(1, 1, 1)
-    np_eps = np.einsum('i,i -> i', np.ones(np.size(epsCoarse)), epsCoarse)
-    drawCoefficientGrid(NWorldCoarse, np_eps, fig, ax, original_style=True, Gridsize=N)
-else:
-    print('... nothing to be updated')
-
+'''
+Solve the PGLOD system
+'''
 print('assemble and solve system')
 KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
 RFull = pglod.assemblePatchFunction(world, patchT, RmsiT)
@@ -199,6 +250,7 @@ uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
 
 uLodFine = modifiedBasis * uFull
 uLodFine += pglod.assemblePatchFunction(world, patchT, correctorRhsT)
+
 '''
 Plot solutions
 '''
