@@ -318,3 +318,77 @@ class MultipleMovingStripes(PerturbationInterface):
 
         for_mapping = np.stack((xpFine[:, 0] + alpha * func.evaluateCQ1(Nmapping, cq1, xpFine), xpFine[:, 1]), axis=1)
         self.psi = discrete_mapping.MappingCQ1(NFine, for_mapping)
+
+class StripesWithDots(PerturbationInterface):
+    def __init__(self, world, number_of_channels, ref_array, space, thick, plot_mapping = False):
+        # TODO: Enhace input arguments
+        self.number_of_channels = number_of_channels
+        self.ref_array = ref_array
+        self.space = space
+        self.thick = thick
+        self.plot_mapping = plot_mapping
+        super().__init__(world)
+        self.create()
+
+
+    def create(self):
+        NFine = self.world.NWorldFine
+        fine = NFine[0]
+        xpFine = util.pCoordinates(NFine)
+
+        number_of_perturbed_channels = 4
+
+        now = 0
+        count = 0
+        for i in range(np.size(self.ref_array)):
+            if self.ref_array[i] == 1:
+                count += 1
+            if count == 8 * self.thick:  # at the 8ths shape (which is the last dot in one line, the cq starts)
+                begin = i + 1
+                break
+        count = 0
+        for i in range(np.size(self.ref_array)):
+            if self.ref_array[i] == 1:
+                count += 1
+            if count == 13 * self.thick - 3:  # it ends after the last channel
+                end = i
+                break
+
+        # Discrete mapping
+        Nmapping = np.array([int(fine), int(fine)])
+        cq1 = np.zeros((int(fine) + 1, int(fine) + 1))
+
+        # I only want to perturb on the fine mesh.
+        size_of_an_element = 1. / fine
+        walk_with_perturbation = size_of_an_element
+
+        channels_position_from_zero = self.space
+        channels_end_from_zero = channels_position_from_zero + self.thick
+
+        # The next only have the purpose to make the psi invertible.
+        increasing_length = (end - begin) // (number_of_perturbed_channels + 1) - self.thick - 2
+        constant_length = (end - begin) - increasing_length * 2
+        maximum_walk = (increasing_length - 6) * walk_with_perturbation
+        walk_with_perturbation = maximum_walk
+        for i in range(increasing_length):
+            cq1[:, begin + 1 + i] = (i + 1) / increasing_length * walk_with_perturbation
+            cq1[:, begin + increasing_length + i + constant_length] = walk_with_perturbation - (
+                        i + 1) / increasing_length * walk_with_perturbation
+        for i in range(constant_length):
+            cq1[:, begin + increasing_length + i] = walk_with_perturbation
+
+        # Check what purtubation I have
+        if self.plot_mapping:
+            plt.figure('DomainMapping')
+            plt.plot(np.arange(0, fine + 1), cq1[self.space, :], label='$id(x) - \psi(x)$')
+            plt.title('Domain mapping')
+            plt.legend()
+
+        cq1 = cq1.flatten()
+
+        xpFine = util.pCoordinates(NFine)
+
+        alpha = 1.
+
+        for_mapping = np.stack((xpFine[:, 0] + alpha * func.evaluateCQ1(Nmapping, cq1, xpFine), xpFine[:, 1]), axis=1)
+        self.psi = discrete_mapping.MappingCQ1(NFine, for_mapping)

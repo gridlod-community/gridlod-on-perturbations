@@ -17,10 +17,9 @@ import perturbations
 import algorithms
 from gridlod_on_perturbations.data import safe_data
 
-ROOT = '../../2d_applications/data/HeKeMa_2019/ex3'
+ROOT = '../../2d_applications/data/HeKeMa_2019/ex4'
 
 # Set global variables for the computation
-
 
 factor = 2**0
 fine = 256 * factor
@@ -41,43 +40,57 @@ world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 Construct diffusion coefficient
 '''
 
-space = 32 * factor
-thick = 4 * factor
+bg = 0.1  # background
+val = 1  # values
+space = 4
+thick = 4
+length = 4
+fine = 256
+NFine = np.array([fine, fine])
 
-bg = 0.1		#background
-val = 1			#values
+#With this array, I construct the coefficient. It is a new feature in buildcoef2d
+ChoosingShapes = np.array([
+    # shape , len, thick, space
+    [   1,      4,     4,   4],
+    [1, 4, 4, 4],
+    [1, 4, 4, 4],
+    [1, 4, 4, 4],
+    [1, 4, 4, 4],
+    [1, 4, 4, 4],
+    [1, 4, 4, 4],
+    [1, 4, 4, 4],
+    [1, 4, 4, 4],
+    [1, 4, 4, 4],
+    [4, fine - 8, 4, 20],
+    [4, fine - 8, 4, 20],
+    [4, fine - 8, 4, 20],
+    [4, fine - 8, 4, 20]])
 
 CoefClass = buildcoef2d.Coefficient2d(NFine,
-                        bg                  = bg,
-                        val                 = val,
-                        length              = 1,
-                        thick               = thick,
-                        space               = space,
-                        probfactor          = 1,
-                        right               = 1,
-                        down                = 0,
-                        diagr1              = 0,
-                        diagr2              = 0,
-                        diagl1              = 0,
-                        diagl2              = 0,
-                        LenSwitch           = None,
-                        thickSwitch         = None,
-                        equidistant         = True,
-                        ChannelHorizontal   = None,
-                        ChannelVertical     = True,
-                        BoundarySpace       = True)
+                                      bg=bg,
+                                      val=val,
+                                      right=1,
+                                      thick=thick,
+                                      space=space,
+                                      length=length,
+                                      LenSwitch=None,
+                                      thickSwitch=None,
+                                      equidistant=True,
+                                      ChannelHorizontal=None,
+                                      ChannelVertical=None,
+                                      BoundarySpace=True,
+                                      probfactor=1,
+                                      ChoosingShapes=ChoosingShapes)
 
+A = CoefClass.BuildCoefficient()
 
-# Set reference coefficient
-aFine_ref_shaped = CoefClass.BuildCoefficient()
-aFine_ref_shaped = CoefClass.SpecificMove(Number=np.arange(0,10), steps=4, Right=1)
+#But for now, the coefficient class makes a small mistake, thus I let the fails disappear.
+Number = [8, 9]
+Correct = CoefClass.SpecificVanish(Number=Number)
+
+# basic init
+aFine_ref_shaped = Correct
 aFine_ref = aFine_ref_shaped.flatten()
-number_of_channels = len(CoefClass.ShapeRemember)
-
-#I want to know the exact places of the channels
-ref_array = aFine_ref_shaped[0]
-
-
 
 '''
 Construct right hand side
@@ -91,13 +104,13 @@ f_ref_reshaped[int(3*fine/8):int(5*fine/8),int(3*fine/8):int(5*fine/8)] = 10
 f_ref = f_ref_reshaped.reshape(NpFine)
 
 
-
 '''
 Domain mapping perturbation
 '''
 number_of_channels = len(CoefClass.ShapeRemember)
+ref_array = aFine_ref_shaped[4]
 
-bending_perturbation = perturbations.MultipleBendingStripes(world, number_of_channels, ref_array, space, thick)
+bending_perturbation = perturbations.StripesWithDots(world, number_of_channels, ref_array, space, thick, plot_mapping = True)
 aFine_pert, f_pert = bending_perturbation.computePerturbation(aFine_ref, f_ref)
 aFine_trans, f_trans = bending_perturbation.computeTransformation(aFine_ref, f_ref)
 
