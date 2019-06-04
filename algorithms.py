@@ -9,12 +9,10 @@ import matplotlib.pyplot as plt
 from gridlod import util, femsolver, interp, coef, fem, lod, pglod
 from gridlod.world import World, Patch
 
-from gridlod_on_perturbations.data import safe_data
-
 
 class AdaptiveAlgorithm:
     def __init__(self, world, k, boundaryConditions, a_Fine_to_be_approximated, aFine_ref, f_trans, epsCoarse, KmsijT,
-                 correctorsListT, patchT, RmsiT, correctorRhsT, uFineFull_trans=None, AFine_trans=None, StartingTolerance=100):
+                 correctorsListT, patchT, RFull, Rf, MFull, uFineFull_trans=None, AFine_trans=None, StartingTolerance=100):
         self.world = world
         self.k = k
         self.boundaryConditions = boundaryConditions
@@ -25,8 +23,9 @@ class AdaptiveAlgorithm:
         self.KmsijT = KmsijT
         self.correctorsListT = correctorsListT
         self.patchT = patchT
-        self.RmsiT = RmsiT
-        self.correctorRhsT = correctorRhsT
+        self.RFull = RFull
+        self.Rf = Rf
+        self.MFull = MFull
         self.uFineFull_trans = uFineFull_trans
         self.AFine_trans = AFine_trans
         self.StartingTolerance = StartingTolerance
@@ -50,7 +49,7 @@ class AdaptiveAlgorithm:
                 if i not in offset:
                     offset.append(i)
                     Elements_to_be_updated.append(i)
-        print('... to be updated: {}%'.format(100*np.size(Elements_to_be_updated)/np.size(self.epsCoarse)), end='') \
+        print('... to be updated: {}%'.format(100*np.size(Elements_to_be_updated)/len(self.epsCoarse)), end='') \
             if Printing else 1
 
         if np.size(Elements_to_be_updated) != 0:
@@ -124,12 +123,10 @@ class AdaptiveAlgorithm:
             to_be_updatedT.append(to_be_updated * full_percentage)
 
             KFull = pglod.assembleMsStiffnessMatrix(world, self.patchT, self.KmsijT)
-            RFull = pglod.assemblePatchFunction(world, self.patchT, self.RmsiT)
-            MFull = fem.assemblePatchMatrix(world.NWorldFine, world.MLocFine)
 
             basis = fem.assembleProlongationMatrix(world.NWorldCoarse, world.NCoarseElement)
 
-            bFull = basis.T * MFull * self.f_trans - RFull
+            bFull = basis.T * self.MFull * self.f_trans - self.RFull
 
             basisCorrectors = pglod.assembleBasisCorrectors(world, self.patchT, self.correctorsListT)
             modifiedBasis = basis - basisCorrectors
@@ -137,7 +134,7 @@ class AdaptiveAlgorithm:
             uFull, _ = pglod.solve(world, KFull, bFull, self.boundaryConditions)
 
             uLodFine = modifiedBasis * uFull
-            uLodFine += pglod.assemblePatchFunction(world, self.patchT, self.correctorRhsT)
+            uLodFine += self.Rf
 
             uFineFull_trans_LOD = uLodFine
 
@@ -171,5 +168,165 @@ class AdaptiveAlgorithm:
                     if computed:
                         print('     stop computing')
                         continue_computing = 0
+
+        return to_be_updatedT, energy_errorT, tmp_errorT, TOLt, uFineFull_trans_LOD
+
+
+class PercentageVsErrorAlgorithm:
+    def __init__(self, world, k, boundaryConditions, a_Fine_to_be_approximated, aFine_ref, f_trans, epsCoarse, KmsijT,
+                 correctorsListT, patchT, RFull, Rf, MFull, uFineFull_trans, AFine_trans):
+        self.world = world
+        self.k = k
+        self.boundaryConditions = boundaryConditions
+        self.a_Fine_to_be_approximated = a_Fine_to_be_approximated
+        self.aFine_ref = aFine_ref
+        self.f_trans = f_trans
+        self.epsCoarse = epsCoarse
+        self.KmsijT = KmsijT
+        self.correctorsListT = correctorsListT
+        self.patchT = patchT
+        self.RFull = RFull
+        self.Rf = Rf
+        self.MFull = MFull
+        self.uFineFull_trans = uFineFull_trans
+        self.AFine_trans = AFine_trans
+
+        self.init = 1
+
+    def UpdateCorrectors(self, TInd):
+        # print(" UPDATING {}".format(TInd))
+        patch = Patch(self.world, self.k, TInd)
+        IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, self.boundaryConditions)
+        rPatch = lambda: coef.localizeCoefficient(patch, self.a_Fine_to_be_approximated)
+
+        correctorsList = lod.computeBasisCorrectors(patch, IPatch, rPatch)
+        csi = lod.computeBasisCoarseQuantities(patch, correctorsList, rPatch)
+        return patch, correctorsList, csi.Kmsij, csi
+
+    def UpdateNextElement(self, tol, offset= [], Printing = False):
+        print('apply tolerance') if Printing else 1
+        Elements_to_be_updated = []
+        for (i,eps) in self.epsCoarse.items():
+            if eps > tol:
+                if i not in offset:
+                    offset.append(i)
+                    Elements_to_be_updated.append(i)
+        print('... to be updated: {}%'.format(100*np.size(Elements_to_be_updated)/len(self.epsCoarse)), end='') \
+            if Printing else 1
+
+        if np.size(Elements_to_be_updated) != 0:
+            # assert(np.size(Elements_to_be_updated) == 1 or np.size(Elements_to_be_updated) == 2) # sometimes we get
+            print('... update correctors') if Printing else 1
+            patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(self.UpdateCorrectors,
+                                                                                 Elements_to_be_updated))
+
+            print('replace Kmsij and update correctorsListT') if Printing else 1
+            KmsijT_list = list(np.copy(self.KmsijT))
+            correctorsListT_list = list(np.copy(self.correctorsListT))
+            i = 0
+            for T in Elements_to_be_updated:
+                KmsijT_list[T] = KmsijTNew[i]
+                correctorsListT_list[T] = correctorsListTNew[i]
+                i += 1
+
+            self.KmsijT = tuple(KmsijT_list)
+            self.correctorsListT = tuple(correctorsListT_list)
+
+            return offset
+        else:
+            print('... there is nothing to be updated') if Printing else 1
+            return offset
+
+    def StartAlgorithm(self):
+        assert(self.init)    # only start the algorithm once
+
+        # in case not every element is affected, the percentage would be missleading.
+        eps_size = np.size(self.epsCoarse)
+        self.epsCoarse = {i: self.epsCoarse[i] for i in range(np.size(self.epsCoarse)) if self.epsCoarse[i] > 0}
+        list = [ v for v in self.epsCoarse.values()]
+        list.append(0)
+        tols = np.sort(np.unique(list))[::-1]
+
+        full_percentage = len(self.epsCoarse) / eps_size
+
+        world = self.world
+        print('starting algorithm ...... ')
+
+        TOLt = []
+        to_be_updatedT = []
+        energy_errorT = []
+        tmp_errorT = []
+
+        offset = []
+        TOL = 100   # not relevant
+
+        for i in range(np.size(tols)):
+            if TOL == 0:
+                pass
+            else:
+                TOL = tols[i]
+
+            TOLt.append(TOL)
+            offset = self.UpdateNextElement(TOL, offset, Printing=False)
+
+            if self.init:
+                to_be_updated = np.size(offset) / len(self.epsCoarse) * 100
+                to_be_updatedT.append(to_be_updated)
+                pass
+            else:
+                to_be_updated = np.size(offset) / len(self.epsCoarse) * 100
+                to_be_updatedT.append(to_be_updated * full_percentage)
+
+            KFull = pglod.assembleMsStiffnessMatrix(world, self.patchT, self.KmsijT)
+
+            basis = fem.assembleProlongationMatrix(world.NWorldCoarse, world.NCoarseElement)
+
+            bFull = basis.T * self.MFull * self.f_trans - self.RFull
+
+            basisCorrectors = pglod.assembleBasisCorrectors(world, self.patchT, self.correctorsListT)
+            modifiedBasis = basis - basisCorrectors
+
+            uFull, _ = pglod.solve(world, KFull, bFull, self.boundaryConditions)
+
+            uLodFine = modifiedBasis * uFull
+            uLodFine += self.Rf
+
+            uFineFull_trans_LOD = uLodFine
+
+            if self.init:
+                uFineFull_trans_LOD_old = uLodFine
+
+            # tmp_error
+            tmp_energy_error = np.sqrt(
+                np.dot((uFineFull_trans_LOD - uFineFull_trans_LOD_old),
+                       self.AFine_trans * (uFineFull_trans_LOD - uFineFull_trans_LOD_old)))
+
+
+            # actual error
+            energy_error = np.sqrt(
+                np.dot((uFineFull_trans_LOD - self.uFineFull_trans),
+                       self.AFine_trans * (uFineFull_trans_LOD - self.uFineFull_trans)))
+
+            uFineFull_trans_LOD_old = uFineFull_trans_LOD
+
+            print(' step({}/{})    TOL: {}, updates: {}%, energy error: {}, tmp_error:{}'.format(i, np.size(tols), TOL,
+                                                                                       to_be_updated * full_percentage,
+                                                                                       energy_error,
+                                                                                       tmp_energy_error))
+            energy_errorT.append(energy_error)
+            tmp_errorT.append(tmp_energy_error)
+
+            if TOL == 0:
+                # stop now
+                break
+
+            if tmp_energy_error < 1e-6:
+                if self.init:
+                    self.init = 0
+                else:
+                    # This is sufficient ! but compute once again for 100%
+                    print('local gain is sufficiently small... aborting')
+                    TOL = 0
+
 
         return to_be_updatedT, energy_errorT, tmp_errorT, TOLt, uFineFull_trans_LOD

@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from gridlod_on_perturbations.data import restore_data
+from gridlod_on_perturbations.data import restore_minimal_data
 
 ROOT = 'ex4/'
 
@@ -9,7 +9,7 @@ kstyles = {1:'{}', 2:'{}', 3:'{}', 4:'{}'}
 
 k = 3
 N = 32
-epsCoarse_DM, complete_tol_DM, complete_errors, tmp_errors, TOLt, uFine, uFineLOD = restore_data(ROOT, k, N)
+epsCoarse_DM, complete_tol_DM, complete_errors, tmp_errors, TOLt, uFine, uFineLOD = restore_minimal_data(ROOT, k, N)
 
 fig = plt.figure('average epsilon domain mapping')
 ax1 = fig.add_subplot(111)

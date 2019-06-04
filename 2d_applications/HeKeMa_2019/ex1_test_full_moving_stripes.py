@@ -15,7 +15,7 @@ from MasterthesisLOD.visualize import drawCoefficientGrid
 
 import perturbations
 import algorithms
-from gridlod_on_perturbations.data import safe_data
+from gridlod_on_perturbations.data import store_minimal_data
 
 ROOT = '../../2d_applications/data/HeKeMa_2019/ex1'
 
@@ -175,6 +175,10 @@ print('precomputing ....')
 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 patchT, correctorRhsT, RmsiT = zip(*map(computeRmsi, range(world.NtCoarse)))
 
+Rf = pglod.assemblePatchFunction(world, patchT, correctorRhsT)
+RFull = pglod.assemblePatchFunction(world, patchT, RmsiT)
+MFull = fem.assemblePatchMatrix(world.NWorldFine, world.MLocFine)
+
 print('computing error indicators')
 epsCoarse = list(map(computeIndicators, range(world.NtCoarse)))
 
@@ -196,15 +200,16 @@ AdaptiveAlgorithm = algorithms.AdaptiveAlgorithm(world = world,
                                                  KmsijT = KmsijT,
                                                  correctorsListT = correctorsListT,
                                                  patchT = patchT,
-                                                 RmsiT = RmsiT,
-                                                 correctorRhsT = correctorRhsT,
+                                                 RFull=RFull,
+                                                 Rf=Rf,
+                                                 MFull=MFull,
                                                  uFineFull_trans = uFineFull_trans,
                                                  AFine_trans = AFine_trans,
                                                  StartingTolerance= 100)
 
 to_be_updatedT, energy_errorT, tmp_errorT, TOLt, uFineFull_trans_LOD = AdaptiveAlgorithm.StartAlgorithm()
 
-safe_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD)
+store_minimal_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD)
 
 '''
 Plot solutions

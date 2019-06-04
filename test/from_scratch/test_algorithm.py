@@ -169,6 +169,10 @@ print('precomputing ....')
 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 patchT, correctorRhsT, RmsiT = zip(*map(computeRmsi, range(world.NtCoarse)))
 
+Rf = pglod.assemblePatchFunction(world, patchT, correctorRhsT)
+RFull = pglod.assemblePatchFunction(world, patchT, RmsiT)
+MFull = fem.assemblePatchMatrix(world.NWorldFine, world.MLocFine)
+
 print('computing error indicators')
 epsCoarse = list(map(computeIndicators, range(world.NtCoarse)))
 
@@ -190,8 +194,9 @@ AdaptiveAlgorithm = algorithms.AdaptiveAlgorithm(world = world,
                                                  KmsijT = KmsijT,
                                                  correctorsListT = correctorsListT,
                                                  patchT = patchT,
-                                                 RmsiT = RmsiT,
-                                                 correctorRhsT = correctorRhsT,
+                                                 RFull=RFull,
+                                                 Rf=Rf,
+                                                 MFull=MFull,
                                                  uFineFull_trans = uFineFull_ref,
                                                  AFine_trans = AFine_ref,
                                                  StartingTolerance= 100)
