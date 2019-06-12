@@ -171,6 +171,57 @@ class BendingInTwoAreas(PerturbationInterface):
 
         self.psi = discrete_mapping.MappingCQ1(NFine, forward_mapping)
 
+class Oscillation(PerturbationInterface):
+    def __init__(self, world, num_dots):
+        super().__init__(world)
+        self.num_dots = num_dots
+        self.create()
+
+    def create(self):
+        NFine = self.world.NWorldFine
+        fine = NFine[0]
+        x = util.pCoordinates(NFine)
+
+        num_dots = self.num_dots
+        epsilon = 0.4
+        frequency = 2*np.pi*num_dots
+        
+        displacement_unscaled = 1./(frequency)*np.column_stack([0.5*(np.sin(0.5*frequency*x[:,0])+1)*np.sin(frequency*x[:,0]),
+                                                                0.5*(np.sin(0.5*frequency*x[:,1])+1)*np.sin(frequency*x[:,1])])
+        point_tile_index = np.array(np.minimum(np.floor(num_dots*x), num_dots-1), dtype=int)
+        tile_scaling = epsilon*2*np.random.rand(num_dots, num_dots)**2
+        point_scaling = tile_scaling[point_tile_index[:,0], point_tile_index[:,1]]
+        
+        displacement = displacement_unscaled*point_scaling[...,None]
+        
+        self.psi = discrete_mapping.MappingCQ1(NFine, x + displacement)
+
+class Pinch(PerturbationInterface):
+    def __init__(self, world):
+        super().__init__(world)
+        self.create()
+
+    def create(self):
+        NFine = self.world.NWorldFine
+        fine = NFine[0]
+        x = util.pCoordinates(NFine)
+
+        x0 = np.array([0.5, 0.5])
+
+        def softmax(t, r):
+            return 1/t*np.log(1 + np.exp(t*r))
+        
+        r = np.linalg.norm((x-x0), axis=1)
+        r_min = 0.05
+        r_bounded = softmax(1/r_min, r)/softmax(1/r_min, 0)
+
+        tapering = np.prod(np.sin(np.pi*x), axis=1)
+        
+        displacement = np.column_stack([tapering*0.015*(r_bounded)**-2,
+                                        tapering*0.015*(r_bounded)**-2])
+        
+        self.psi = discrete_mapping.MappingCQ1(NFine, x + displacement)
+        
 class MultipleBendingStripes(PerturbationInterface):
     def __init__(self, world, number_of_channels, ref_array, space, thick):
         # TODO: Enhace input arguments
