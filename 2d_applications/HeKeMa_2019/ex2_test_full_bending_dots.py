@@ -3,6 +3,7 @@
 # Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
+import random
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -41,8 +42,8 @@ world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 Construct diffusion coefficient
 '''
 
-space = 6 * factor
-thick = 3 * factor
+space = 3 * factor
+thick = 6 * factor
 
 bg = 0.1		#background
 val = 1			#values
@@ -72,6 +73,20 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
 aFine_ref_shaped = CoefClass.BuildCoefficient()
 aFine_ref = aFine_ref_shaped.flatten()
 
+# decision
+valc = np.shape(CoefClass.ShapeRemember)[0]
+numbers = []
+decision = np.zeros(100)
+decision[0] = 1
+
+
+for i in range(0,valc):
+    a = random.sample(list(decision),1)[0]
+    if a == 1:
+        numbers.append(i)
+
+aFine_with_defects = CoefClass.SpecificVanish(Number = numbers).flatten()
+
 '''
 Construct right hand side
 '''
@@ -89,9 +104,9 @@ f_ref = f_ref_reshaped.reshape(NpFine)
 Domain mapping perturbation
 '''
 
-bending_perturbation = perturbations.BendingInTwoAreas(world)
-aFine_pert, f_pert = bending_perturbation.computePerturbation(aFine_ref, f_ref)
-aFine_trans, f_trans = bending_perturbation.computeTransformation(aFine_ref, f_ref)
+bending_perturbation = perturbations.Pinch(world)
+aFine_pert, f_pert = bending_perturbation.computePerturbation(aFine_with_defects, f_ref)
+aFine_trans, f_trans = bending_perturbation.computeTransformation(aFine_with_defects, f_ref)
 
 '''
 Plot diffusion coefficient and right hand side

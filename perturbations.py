@@ -208,17 +208,14 @@ class Pinch(PerturbationInterface):
 
         x0 = np.array([0.5, 0.5])
 
-        def softmax(t, r):
-            return 1/t*np.log(1 + np.exp(t*r))
-        
         r = np.linalg.norm((x-x0), axis=1)
-        r_min = 0.05
-        r_bounded = softmax(1/r_min, r)/softmax(1/r_min, 0)
+        r_min = 0.1
+        r_bounded = np.maximum(r, r_min)/r_min
 
         tapering = np.prod(np.sin(np.pi*x), axis=1)
         
-        displacement = np.column_stack([tapering*0.015*(r_bounded)**-2,
-                                        tapering*0.015*(r_bounded)**-2])
+        displacement = np.column_stack([tapering*0.02*(r_bounded)**-2,
+                                        tapering*0.02*(r_bounded)**-2])
         
         self.psi = discrete_mapping.MappingCQ1(NFine, x + displacement)
         

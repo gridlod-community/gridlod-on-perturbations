@@ -27,8 +27,8 @@ def drawCoefficient_origin(N, a):
 
     plt.imshow(aCube,
                origin='lower_left',
-               interpolation='none')
-    plt.colorbar()
+               interpolation='none', cmap=cmap)
+    plt.axis('off')
 
 def d3sol(N, s, String='FinescaleSolution'):
     '''
