@@ -12,7 +12,7 @@ from gridlod.world import World, Patch
 
 class AdaptiveAlgorithm:
     def __init__(self, world, k, boundaryConditions, a_Fine_to_be_approximated, aFine_ref, f_trans, epsCoarse, KmsijT,
-                 correctorsListT, patchT, RFull, Rf, MFull, uFineFull_trans=None, AFine_trans=None, StartingTolerance=100):
+                 correctorsListT, patchT, RmsijT, correctorsRhsT, MFull, uFineFull_trans=None, AFine_trans=None, StartingTolerance=100):
         self.world = world
         self.k = k
         self.boundaryConditions = boundaryConditions
@@ -23,8 +23,8 @@ class AdaptiveAlgorithm:
         self.KmsijT = KmsijT
         self.correctorsListT = correctorsListT
         self.patchT = patchT
-        self.RFull = RFull
-        self.Rf = Rf
+        self.RmsijT = RmsijT
+        self.correctorsRhsT = correctorsRhsT
         self.MFull = MFull
         self.uFineFull_trans = uFineFull_trans
         self.AFine_trans = AFine_trans
@@ -37,9 +37,18 @@ class AdaptiveAlgorithm:
         IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, self.boundaryConditions)
         rPatch = lambda: coef.localizeCoefficient(patch, self.a_Fine_to_be_approximated)
 
+        MRhsList = [self.f_trans[util.extractElementFine(self.world.NWorldCoarse,
+                                                  self.world.NCoarseElement,
+                                                  patch.iElementWorldCoarse,
+                                                  extractElements=False)]];
+
         correctorsList = lod.computeBasisCorrectors(patch, IPatch, rPatch)
         csi = lod.computeBasisCoarseQuantities(patch, correctorsList, rPatch)
-        return patch, correctorsList, csi.Kmsij, csi
+
+        correctorRhs = lod.computeElementCorrector(patch, IPatch, rPatch, None, MRhsList)[0]
+        Rmsij = lod.computeRhsCoarseQuantities(patch, correctorRhs, rPatch)
+
+        return patch, correctorsList, csi.Kmsij, Rmsij, correctorRhs
 
     def UpdateElements(self, tol, offset= [], Printing = False):
         print('apply tolerance') if Printing else 1
@@ -54,20 +63,27 @@ class AdaptiveAlgorithm:
 
         if np.size(Elements_to_be_updated) != 0:
             print('... update correctors') if Printing else 1
-            patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(self.UpdateCorrectors,
+            patchT_irrelevant, correctorsListTNew, KmsijTNew, RmsijTNew, correctorsRhsNew = zip(*map(self.UpdateCorrectors,
                                                                                  Elements_to_be_updated))
 
             print('replace Kmsij and update correctorsListT') if Printing else 1
+            RmsijT_list = list(np.copy(self.RmsijT))
+            correctorsRhs_list = list(np.copy(self.correctorsRhsT))
             KmsijT_list = list(np.copy(self.KmsijT))
             correctorsListT_list = list(np.copy(self.correctorsListT))
             i = 0
             for T in Elements_to_be_updated:
                 KmsijT_list[T] = KmsijTNew[i]
                 correctorsListT_list[T] = correctorsListTNew[i]
+                RmsijT_list[T] = RmsijTNew[i]
+                correctorsRhs_list[T] = correctorsRhsNew[i]
                 i += 1
 
             self.KmsijT = tuple(KmsijT_list)
             self.correctorsListT = tuple(correctorsListT_list)
+            self.RmsijT = tuple(RmsijT_list)
+            self.correctorsRhsT = tuple(correctorsRhs_list)
+
 
             return offset, 1 # computed
         else:
@@ -90,6 +106,7 @@ class AdaptiveAlgorithm:
         TOLt = []
         to_be_updatedT = []
         energy_errorT = []
+        rel_energy_errorT = []
         tmp_errorT = []
 
         offset = []
@@ -123,10 +140,12 @@ class AdaptiveAlgorithm:
             to_be_updatedT.append(to_be_updated * full_percentage)
 
             KFull = pglod.assembleMsStiffnessMatrix(world, self.patchT, self.KmsijT)
+            RFull = pglod.assemblePatchFunction(world, self.patchT, self.RmsijT)
+            Rf = pglod.assemblePatchFunction(world, self.patchT, self.correctorsRhsT)
 
             basis = fem.assembleProlongationMatrix(world.NWorldCoarse, world.NCoarseElement)
 
-            bFull = basis.T * self.MFull * self.f_trans - self.RFull
+            bFull = basis.T * self.MFull * self.f_trans - RFull
 
             basisCorrectors = pglod.assembleBasisCorrectors(world, self.patchT, self.correctorsListT)
             modifiedBasis = basis - basisCorrectors
@@ -134,7 +153,7 @@ class AdaptiveAlgorithm:
             uFull, _ = pglod.solve(world, KFull, bFull, self.boundaryConditions)
 
             uLodFine = modifiedBasis * uFull
-            uLodFine += self.Rf
+            uLodFine += Rf
 
             uFineFull_trans_LOD = uLodFine
 
@@ -142,11 +161,12 @@ class AdaptiveAlgorithm:
                 uFineFull_trans_LOD_old = uLodFine
                 self.init = 0
 
+            energy_norm = np.sqrt(np.dot(uFineFull_trans_LOD, self.AFine_trans * uFineFull_trans_LOD))
             # tmp_error
             tmp_energy_error = np.sqrt(
                 np.dot((uFineFull_trans_LOD - uFineFull_trans_LOD_old),
                        self.AFine_trans * (uFineFull_trans_LOD - uFineFull_trans_LOD_old)))
-            old_tmp_energy_error = tmp_energy_error
+
 
             # actual error
             energy_error = np.sqrt(
@@ -155,12 +175,15 @@ class AdaptiveAlgorithm:
 
             uFineFull_trans_LOD_old = uFineFull_trans_LOD
 
-            print('      TOL: {}, updates: {}%, energy error: {}, tmp_error:{}'.format(TOL,
+            print(' step({:3d}/{})    TOL: {:f}, updates: {:7.3f}%, energy error: {:f}, tmp_error: {:f}, relative energy error: {:f}'.format(i, np.size(tols), TOL,
                                                                                        to_be_updated * full_percentage,
                                                                                        energy_error,
-                                                                                       tmp_energy_error))
+                                                                                       tmp_energy_error, energy_error/energy_norm))
+
+            rel_energy_errorT.append(energy_error/energy_norm)
             energy_errorT.append(energy_error)
             tmp_errorT.append(tmp_energy_error)
+
             if tmp_energy_error > 1e-5:
                 TOL *= 3 / 4.
             else:
@@ -169,12 +192,12 @@ class AdaptiveAlgorithm:
                         print('     stop computing')
                         continue_computing = 0
 
-        return to_be_updatedT, energy_errorT, tmp_errorT, TOLt, uFineFull_trans_LOD
+        return to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans_LOD
 
 
 class PercentageVsErrorAlgorithm:
     def __init__(self, world, k, boundaryConditions, a_Fine_to_be_approximated, aFine_ref, f_trans, epsCoarse, KmsijT,
-                 correctorsListT, patchT, RFull, Rf, MFull, uFineFull_trans, AFine_trans):
+                 correctorsListT, patchT, RmsijT, correctorsRhsT, MFull, uFineFull_trans, AFine_trans):
         self.world = world
         self.k = k
         self.boundaryConditions = boundaryConditions
@@ -185,8 +208,8 @@ class PercentageVsErrorAlgorithm:
         self.KmsijT = KmsijT
         self.correctorsListT = correctorsListT
         self.patchT = patchT
-        self.RFull = RFull
-        self.Rf = Rf
+        self.RmsijT = RmsijT
+        self.correctorsRhsT = correctorsRhsT
         self.MFull = MFull
         self.uFineFull_trans = uFineFull_trans
         self.AFine_trans = AFine_trans
@@ -199,9 +222,18 @@ class PercentageVsErrorAlgorithm:
         IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, self.boundaryConditions)
         rPatch = lambda: coef.localizeCoefficient(patch, self.a_Fine_to_be_approximated)
 
+        MRhsList = [self.f_trans[util.extractElementFine(self.world.NWorldCoarse,
+                                                  self.world.NCoarseElement,
+                                                  patch.iElementWorldCoarse,
+                                                  extractElements=False)]];
+
         correctorsList = lod.computeBasisCorrectors(patch, IPatch, rPatch)
         csi = lod.computeBasisCoarseQuantities(patch, correctorsList, rPatch)
-        return patch, correctorsList, csi.Kmsij, csi
+
+        correctorRhs = lod.computeElementCorrector(patch, IPatch, rPatch, None, MRhsList)[0]
+        Rmsij = lod.computeRhsCoarseQuantities(patch, correctorRhs, rPatch)
+
+        return patch, correctorsList, csi.Kmsij, Rmsij, correctorRhs
 
     def UpdateNextElement(self, tol, offset= [], Printing = False):
         print('apply tolerance') if Printing else 1
@@ -217,20 +249,26 @@ class PercentageVsErrorAlgorithm:
         if np.size(Elements_to_be_updated) != 0:
             # assert(np.size(Elements_to_be_updated) == 1 or np.size(Elements_to_be_updated) == 2) # sometimes we get
             print('... update correctors') if Printing else 1
-            patchT_irrelevant, correctorsListTNew, KmsijTNew, csiTNew = zip(*map(self.UpdateCorrectors,
+            patchT_irrelevant, correctorsListTNew, KmsijTNew, RmsijTNew, correctorsRhsNew = zip(*map(self.UpdateCorrectors,
                                                                                  Elements_to_be_updated))
 
             print('replace Kmsij and update correctorsListT') if Printing else 1
+            RmsijT_list = list(np.copy(self.RmsijT))
+            correctorsRhs_list = list(np.copy(self.correctorsRhsT))
             KmsijT_list = list(np.copy(self.KmsijT))
             correctorsListT_list = list(np.copy(self.correctorsListT))
             i = 0
             for T in Elements_to_be_updated:
                 KmsijT_list[T] = KmsijTNew[i]
                 correctorsListT_list[T] = correctorsListTNew[i]
+                RmsijT_list[T] = RmsijTNew[i]
+                correctorsRhs_list[T] = correctorsRhsNew[i]
                 i += 1
 
             self.KmsijT = tuple(KmsijT_list)
             self.correctorsListT = tuple(correctorsListT_list)
+            self.RmsijT = tuple(RmsijT_list)
+            self.correctorsRhsT = tuple(correctorsRhs_list)
 
             return offset
         else:
@@ -255,6 +293,7 @@ class PercentageVsErrorAlgorithm:
         TOLt = []
         to_be_updatedT = []
         energy_errorT = []
+        rel_energy_errorT = []
         tmp_errorT = []
 
         offset = []
@@ -278,10 +317,12 @@ class PercentageVsErrorAlgorithm:
                 to_be_updatedT.append(to_be_updated * full_percentage)
 
             KFull = pglod.assembleMsStiffnessMatrix(world, self.patchT, self.KmsijT)
+            RFull = pglod.assemblePatchFunction(world, self.patchT, self.RmsijT)
+            Rf = pglod.assemblePatchFunction(world, self.patchT, self.correctorsRhsT)
 
             basis = fem.assembleProlongationMatrix(world.NWorldCoarse, world.NCoarseElement)
 
-            bFull = basis.T * self.MFull * self.f_trans - self.RFull
+            bFull = basis.T * self.MFull * self.f_trans - RFull
 
             basisCorrectors = pglod.assembleBasisCorrectors(world, self.patchT, self.correctorsListT)
             modifiedBasis = basis - basisCorrectors
@@ -289,13 +330,14 @@ class PercentageVsErrorAlgorithm:
             uFull, _ = pglod.solve(world, KFull, bFull, self.boundaryConditions)
 
             uLodFine = modifiedBasis * uFull
-            uLodFine += self.Rf
+            uLodFine += Rf
 
             uFineFull_trans_LOD = uLodFine
 
             if self.init:
                 uFineFull_trans_LOD_old = uLodFine
 
+            energy_norm = np.sqrt(np.dot(uFineFull_trans_LOD, self.AFine_trans * uFineFull_trans_LOD))
             # tmp_error
             tmp_energy_error = np.sqrt(
                 np.dot((uFineFull_trans_LOD - uFineFull_trans_LOD_old),
@@ -309,10 +351,12 @@ class PercentageVsErrorAlgorithm:
 
             uFineFull_trans_LOD_old = uFineFull_trans_LOD
 
-            print(' step({}/{})    TOL: {}, updates: {}%, energy error: {}, tmp_error:{}'.format(i, np.size(tols), TOL,
+            print(' step({:3d}/{})    TOL: {:f}, updates: {:7.3f}%, energy error: {:f}, tmp_error: {:f}, relative energy error: {:f}'.format(i, np.size(tols), TOL,
                                                                                        to_be_updated * full_percentage,
                                                                                        energy_error,
-                                                                                       tmp_energy_error))
+                                                                                       tmp_energy_error, energy_error/energy_norm))
+
+            rel_energy_errorT.append(energy_error/energy_norm)
             energy_errorT.append(energy_error)
             tmp_errorT.append(tmp_energy_error)
 
@@ -329,4 +373,4 @@ class PercentageVsErrorAlgorithm:
                     TOL = 0
 
 
-        return to_be_updatedT, energy_errorT, tmp_errorT, TOLt, uFineFull_trans_LOD
+        return to_be_updatedT, energy_errorT, tmp_errorT,rel_energy_errorT, TOLt, uFineFull_trans_LOD

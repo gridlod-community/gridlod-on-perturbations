@@ -23,7 +23,7 @@ def drawCoefficient_origin(N, a):
 
     plt.clf()
 
-    cmap = plt.cm.plasma
+    cmap = plt.cm.hot_r
 
     plt.imshow(aCube,
                origin='lower_left',

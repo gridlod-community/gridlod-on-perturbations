@@ -3,9 +3,9 @@
 # Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
+import random
 import numpy as np
 import matplotlib.pyplot as plt
-import random
 
 from gridlod import util, femsolver, interp, coef, fem, lod, pglod
 from gridlod.world import World, Patch
@@ -16,21 +16,24 @@ from MasterthesisLOD.visualize import drawCoefficientGrid
 
 import perturbations
 import algorithms
-from gridlod_on_perturbations.data import store_all_data
+from gridlod_on_perturbations.data import store_minimal_data
 
-ROOT = '../../2d_applications/data/Axels_Experiment/20x20dots'
+ROOT = '../../2d_applications/data/HeKeMa_2019/ex3'
 
 # Set global variables for the computation
 
-potenz = 8
-factor = 2**(potenz - 8)
-fine = 2**potenz
-N = 2**5
+# Set global variables for the computation
+
+factor = 2**0
+fine = 256 * factor
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))))
-k = 4  # goes like log H
+N = 2**5
+
+k = 4
+print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))), '    k = ', k)
+
 NWorldCoarse = np.array([N, N])
 
 # boundary Conditions
@@ -43,8 +46,8 @@ world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 Construct diffusion coefficient
 '''
 
-space = 6 * factor
-thick = 3 * factor
+space = 32 * factor
+thick = 4 * factor
 
 bg = 0.1		#background
 val = 1			#values
@@ -52,7 +55,7 @@ val = 1			#values
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg                  = bg,
                         val                 = val,
-                        length              = thick,
+                        length              = 1,
                         thick               = thick,
                         space               = space,
                         probfactor          = 1,
@@ -66,15 +69,30 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         thickSwitch         = None,
                         equidistant         = True,
                         ChannelHorizontal   = None,
-                        ChannelVertical     = None,
+                        ChannelVertical     = True,
                         BoundarySpace       = True)
+
 
 
 # Set reference coefficient
 aFine_ref_shaped = CoefClass.BuildCoefficient()
+aFine_ref_shaped = CoefClass.SpecificMove(Number=np.arange(0,10), steps=4, Right=1)
 aFine_ref = aFine_ref_shaped.flatten()
 
-print('number of dots: {}'.format(np.shape(CoefClass.ShapeRemember)[0]))
+
+# decision
+valc = np.shape(CoefClass.ShapeRemember)[0]
+numbers = []
+decision = np.zeros(10)
+decision[0] = 1
+
+
+for i in range(0,valc):
+    a = random.sample(list(decision),1)[0]
+    if a == 1:
+        numbers.append(i)
+
+aFine_with_defects = CoefClass.SpecificVanish(Number = numbers).flatten()
 
 '''
 Construct right hand side
@@ -88,24 +106,16 @@ f_ref_reshaped[int(1*fine/8):int(7*fine/8),int(1*fine/8):int(7*fine/8)] = 10
 f_ref = f_ref_reshaped.reshape(NpFine)
 
 
+
 '''
-Perturbation using buildcoef2d
+Domain mapping perturbation
 '''
+number_of_channels = len(CoefClass.ShapeRemember)
 
-# decision
-valc = np.shape(CoefClass.ShapeRemember)[0]
-numbers = []
-decision = np.zeros(50)
-decision[0] = 1
+bending_perturbation = perturbations.MultipleMovingStripes(world, number_of_channels, space, thick, plot_mapping = True)
+aFine_pert, f_pert = bending_perturbation.computePerturbation(aFine_with_defects, f_ref)
+aFine_trans, f_trans = bending_perturbation.computeTransformation(aFine_with_defects, f_ref)
 
-
-for i in range(0,valc):
-    a = random.sample(list(decision),1)[0]
-    if a == 1:
-        numbers.append(i)
-
-# ATTENTION : In this case TRANS means PERTURBED
-aFine_trans = CoefClass.SpecificVanish(Number = numbers).flatten()
 
 '''
 Plot diffusion coefficient and right hand side
@@ -115,6 +125,9 @@ plt.figure("Coefficient")
 drawCoefficient_origin(NFine, aFine_ref)
 
 plt.figure("Perturbed coefficient")
+drawCoefficient_origin(NFine, aFine_pert)
+
+plt.figure('transformed')
 drawCoefficient_origin(NFine, aFine_trans)
 
 plt.figure('Right hand side')
@@ -123,11 +136,19 @@ drawCoefficient_origin(NFine+1, f_ref)
 plt.show()
 
 '''
-Compute FEM
+Check whether domain mapping method works sufficiently good
 '''
 
-uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_ref, None, boundaryConditions)
+uFineFull_pert, AFine_pert, _ = femsolver.solveFine(world, aFine_pert, f_pert, None, boundaryConditions)
+uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_trans, None, boundaryConditions)
 
+u_FineFull_trans_pert = bending_perturbation.evaluateSolution(uFineFull_trans)
+
+energy_norm = np.sqrt(np.dot(uFineFull_pert, AFine_pert * uFineFull_pert))
+energy_error = np.sqrt(np.dot((u_FineFull_trans_pert - uFineFull_pert),
+                              AFine_pert * (u_FineFull_trans_pert - uFineFull_pert)))
+print("Domain Mapping with FEM: Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error,
+                                                       energy_error / energy_norm))
 
 '''
 Set the coefficient that we want to approximate and the tolerance
@@ -176,6 +197,8 @@ print('precomputing ....')
 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 patchT, correctorRhsT, RmsiT = zip(*map(computeRmsi, range(world.NtCoarse)))
 
+
+RFull = pglod.assemblePatchFunction(world, patchT, RmsiT)
 MFull = fem.assemblePatchMatrix(world.NWorldFine, world.MLocFine)
 
 print('computing error indicators')
@@ -188,7 +211,6 @@ fig = plt.figure("error indicator")
 ax = fig.add_subplot(1, 1, 1)
 np_eps = np.einsum('i,i -> i', np.ones(np.size(epsCoarse)), epsCoarse)
 drawCoefficientGrid(NWorldCoarse, np_eps, fig, ax, original_style=True, Gridsize=N)
-
 
 Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
                                                  k = k ,
@@ -204,11 +226,12 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
                                                  correctorsRhsT = correctorRhsT,
                                                  MFull = MFull,
                                                  uFineFull_trans = uFineFull_trans,
-                                                 AFine_trans = AFine_trans)
+                                                 AFine_trans = AFine_trans )
+                                                 # ,StartingTolerance=0)
 
-to_be_updatedT, energy_errorT, tmp_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
+to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 
-store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans, f_ref, name="test2_perc")
+store_minimal_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD)
 
 '''
 Plot solutions

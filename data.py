@@ -1,6 +1,6 @@
 import csv
 
-def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, TOLt, uFine, uFineLOD,
+def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFine, uFineLOD,
                    NWorldFine, NWorldCoarse, ABase, APert, f_ref, ATrans = None, f_trans = None, name='test'):
     if ATrans is None:
         ATrans = APert
@@ -25,6 +25,11 @@ def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, t
     with open('{}/{}_k{}_H{}_tmp_error.txt'.format(ROOT, name, k, N), 'w') as csvfile:
         writer = csv.writer(csvfile)
         for val in tmp_errorT:
+            writer.writerow([val])
+
+    with open('{}/{}_k{}_H{}_rel_error.txt'.format(ROOT, name, k, N), 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for val in rel_energy_errorT:
             writer.writerow([val])
 
     with open('{}/{}_TOLs_k{}_H{}.txt'.format(ROOT, name, k, N), 'w') as csvfile:
@@ -84,7 +89,7 @@ def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, t
             writer.writerow([val])
 
 
-def store_minimal_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, TOLt, uFine,
+def store_minimal_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFine,
                        uFineLOD, name = 'test'):
     with open('{}/{}_k{}_H{}_epsCoarse.txt'.format(ROOT, name, k, N), 'w') as csvfile:
         writer = csv.writer(csvfile)
@@ -104,6 +109,11 @@ def store_minimal_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_error
     with open('{}/{}_k{}_H{}_tmp_error.txt'.format(ROOT, name, k, N), 'w') as csvfile:
         writer = csv.writer(csvfile)
         for val in tmp_errorT:
+            writer.writerow([val])
+
+    with open('{}/{}_k{}_H{}_rel_error.txt'.format(ROOT, name, k, N), 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for val in rel_energy_errorT:
             writer.writerow([val])
 
     with open('{}/{}_TOLs_k{}_H{}.txt'.format(ROOT, name, k, N), 'w') as csvfile:
@@ -127,6 +137,7 @@ def restore_all_data(ROOT, k, N, name = 'test'):
     complete_tol_DM = []
     complete_errors = []
     tmp_errors = []
+    rel_errors = []
     TOLt = []
     uFine = []
     uFineLOD = []
@@ -166,6 +177,12 @@ def restore_all_data(ROOT, k, N, name = 'test'):
     reader = csv.reader(f)
     for val in reader:
         tmp_errors.append(float(val[0]))
+    f.close()
+
+    f = open('{}/{}_k{}_H{}_rel_error.txt'.format(ROOT, name, k, N), 'r')
+    reader = csv.reader(f)
+    for val in reader:
+        rel_errors.append(float(val[0]))
     f.close()
 
     f = open("{}/{}_uFine_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
@@ -226,7 +243,7 @@ def restore_all_data(ROOT, k, N, name = 'test'):
         f_trans.append(float(val[0]))
     f.close()
 
-    return epsCoarse_DM, complete_tol_DM, complete_errors, tmp_errors, TOLt, uFine, uFineLOD, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans
+    return epsCoarse_DM, complete_tol_DM, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans
 
 
 def restore_minimal_data(ROOT, k, N, name = 'test'):
@@ -234,6 +251,7 @@ def restore_minimal_data(ROOT, k, N, name = 'test'):
     to_be_updated = []
     complete_errors = []
     tmp_errors = []
+    rel_errors = []
     TOLt = []
     uFine = []
     uFineLOD = []
@@ -268,6 +286,12 @@ def restore_minimal_data(ROOT, k, N, name = 'test'):
         tmp_errors.append(float(val[0]))
     f.close()
 
+    f = open('{}/{}_k{}_H{}_rel_error.txt'.format(ROOT, name, k, N), 'r')
+    reader = csv.reader(f)
+    for val in reader:
+        rel_errors.append(float(val[0]))
+    f.close()
+
     f = open("{}/{}_uFine_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
@@ -281,4 +305,4 @@ def restore_minimal_data(ROOT, k, N, name = 'test'):
     f.close()
 
 
-    return epsCoarse_DM, to_be_updated, complete_errors, tmp_errors, TOLt, uFine, uFineLOD
+    return epsCoarse_DM, to_be_updated, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD
