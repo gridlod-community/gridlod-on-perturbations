@@ -312,14 +312,14 @@ class MultipleMovingStripes(PerturbationInterface):
 
         epsilonT = []
         cq1 = np.zeros((int(fine) + 1, int(fine) + 1))
-
+        random.seed(20)
         cs = np.random.randint(0, 2, self.number_of_channels)
         cs = [c * random.sample([-1, 1], 1)[0] for c in cs]
 
-        # or manually
-        cs[3] = 10
-        cs[4] = 2
-        cs[5] = 1
+        ## or manually
+        # cs[3] = 10
+        # cs[4] = 2
+        # cs[5] = 1
 
         print(cs)
 

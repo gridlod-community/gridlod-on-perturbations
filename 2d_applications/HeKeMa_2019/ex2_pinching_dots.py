@@ -79,7 +79,7 @@ aFine_ref = aFine_ref_shaped.flatten()
 # decision
 valc = np.shape(CoefClass.ShapeRemember)[0]
 numbers = []
-decision = np.zeros(50)
+decision = np.zeros(20)
 decision[0] = 1
 
 

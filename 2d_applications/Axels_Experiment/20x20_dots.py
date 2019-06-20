@@ -43,8 +43,8 @@ world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 Construct diffusion coefficient
 '''
 
-space = 6 * factor
-thick = 3 * factor
+space = 8 * factor
+thick = 4 * factor
 
 bg = 0.1		#background
 val = 1			#values

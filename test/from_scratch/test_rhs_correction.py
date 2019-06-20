@@ -14,13 +14,14 @@ from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin
 
 from MasterthesisLOD import buildcoef2d
 
-factor = 2**0
-fine = 128 * factor
+potenz = 8
+factor = 2**(potenz - 8)
+fine = 2**potenz
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-space = 16 * factor
-thick = 2 * factor
+space = int(6 * factor)
+thick = int(6 * factor)
 
 bg = 0.1		#background
 val = 1			#values
@@ -28,7 +29,7 @@ val = 1			#values
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg                  = bg,
                         val                 = val,
-                        length              = 1,
+                        length              = thick,
                         thick               = thick,
                         space               = space,
                         probfactor          = 1,
@@ -42,7 +43,7 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         thickSwitch         = None,
                         equidistant         = True,
                         ChannelHorizontal   = None,
-                        ChannelVertical     = True,
+                        ChannelVertical     = None,
                         BoundarySpace       = True)
 
 
@@ -54,18 +55,30 @@ boundaryConditions = np.array([[0, 0], [0, 0]])
 world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 
 
-f = np.ones(world.NpFine) * 10.
-#f = f_cheat
+f = np.ones(NpFine) * 0.0001
+f_reshaped = f.reshape(NFine+1)
+# f_ref_reshaped[int(0*fine/8):int(2*fine/8),int(0*fine/8):int(2*fine/8)] = 1
+# f_ref_reshaped[int(6*fine/8):int(8*fine/8),int(6*fine/8):int(8*fine/8)] = 1
+f_reshaped[int(1*fine/8):int(7*fine/8),int(1*fine/8):int(7*fine/8)] = 10
+f = f_reshaped.reshape(NpFine)
+
+plt.figure("Coefficient")
+drawCoefficient_origin(NFine, aFine)
+
+plt.figure('Right hand side')
+drawCoefficient_origin(NFine+1, f)
+
+plt.show()
+
 uSol, AFine, _ = femsolver.solveFine(world, aFine, f, None, boundaryConditions)
 
-kList = [1,2,3,4]
-NList = [2,4,8,16,32]
+kList = [4]
+NList = [32]
 logH = {N: np.abs(np.log(np.sqrt(2*(1./N**2)))) for N in NList}
-print(logH)
 for N in NList:
     print('___________________________________________________')
     for k in kList:
-        print('   k = {}    N = {}    logH = {}'.format(k,N,logH[N]))
+        print('   k = {}    H = 1/{}    logH = {}'.format(k,N,logH[N]), '   => k = {} should be sufficient'.format(int(logH[N]+0.9)))
         NWorldCoarse = np.array([N,N])
         NCoarseElement = NFine // NWorldCoarse
         boundaryConditions = np.array([[0, 0], [0, 0]])

@@ -166,7 +166,7 @@ class AdaptiveAlgorithm:
             tmp_energy_error = np.sqrt(
                 np.dot((uFineFull_trans_LOD - uFineFull_trans_LOD_old),
                        self.AFine_trans * (uFineFull_trans_LOD - uFineFull_trans_LOD_old)))
-
+            old_tmp_energy_error = tmp_energy_error
 
             # actual error
             energy_error = np.sqrt(
@@ -175,7 +175,7 @@ class AdaptiveAlgorithm:
 
             uFineFull_trans_LOD_old = uFineFull_trans_LOD
 
-            print(' step({:3d}/{})    TOL: {:f}, updates: {:7.3f}%, energy error: {:f}, tmp_error: {:f}, relative energy error: {:f}'.format(i, np.size(tols), TOL,
+            print('             TOL: {:f}, updates: {:7.3f}%, energy error: {:f}, tmp_error: {:f}, relative energy error: {:f}'.format(TOL,
                                                                                        to_be_updated * full_percentage,
                                                                                        energy_error,
                                                                                        tmp_energy_error, energy_error/energy_norm))

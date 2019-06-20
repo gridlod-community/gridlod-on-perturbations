@@ -206,9 +206,9 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
                                                  uFineFull_trans = uFineFull_trans,
                                                  AFine_trans = AFine_trans)
 
-to_be_updatedT, energy_errorT, tmp_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
+to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 
-store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans, f_ref, name="test2_perc")
+store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans, f_ref, name="test2_perc")
 
 '''
 Plot solutions

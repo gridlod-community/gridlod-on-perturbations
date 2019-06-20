@@ -18,7 +18,7 @@ import perturbations
 import algorithms
 from gridlod_on_perturbations.data import store_minimal_data
 
-ROOT = '../../2d_applications/data/HeKeMa_2019/ex3'
+ROOT = '../../2d_applications/data/HeKeMa_2019/ex'
 
 # Set global variables for the computation
 
@@ -29,9 +29,9 @@ fine = 256 * factor
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-N = 2**5
+N = 2**2
 
-k = 4
+k = 2
 print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))), '    k = ', k)
 
 NWorldCoarse = np.array([N, N])
@@ -46,7 +46,7 @@ world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 Construct diffusion coefficient
 '''
 
-space = 32 * factor
+space = 24 * factor
 thick = 4 * factor
 
 bg = 0.1		#background
@@ -83,16 +83,16 @@ aFine_ref = aFine_ref_shaped.flatten()
 # decision
 valc = np.shape(CoefClass.ShapeRemember)[0]
 numbers = []
-decision = np.zeros(10)
+decision = np.zeros(20)
 decision[0] = 1
-
+random.seed(10)
 
 for i in range(0,valc):
     a = random.sample(list(decision),1)[0]
     if a == 1:
         numbers.append(i)
 
-aFine_with_defects = CoefClass.SpecificVanish(Number = numbers).flatten()
+aFine_with_defects = CoefClass.SpecificVanish(Number = numbers, Original=False).flatten()
 
 '''
 Construct right hand side
@@ -226,8 +226,8 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
                                                  correctorsRhsT = correctorRhsT,
                                                  MFull = MFull,
                                                  uFineFull_trans = uFineFull_trans,
-                                                 AFine_trans = AFine_trans )
-                                                 # ,StartingTolerance=0)
+                                                 AFine_trans = AFine_trans)
+                                                 #,StartingTolerance=100)
 
 to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 
