@@ -18,18 +18,19 @@ import perturbations
 import algorithms
 from gridlod_on_perturbations.data import store_all_data
 
-ROOT = '../../2d_applications/data/HeKeMa_2019/ex3'
+ROOT = '../../2d_applications/data/HeKeMa_2019/ex4'
 
 # Set global variables for the computation
 
-factor = 2**0
-fine = 256 * factor
+potenz = 8
+factor = 2**(potenz - 8)
+fine = 2**potenz
+N = 2**5
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
 
-N = 2**5
-
 k = 4
+
 print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))), '    k = ', k)
 
 NWorldCoarse = np.array([N, N])
@@ -44,17 +45,20 @@ world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 Construct diffusion coefficient
 '''
 
-######## These are the only numbers you need to change for the buildcoef2d class
-space = 24 * factor     # fine elements between the dots !
-thick = 4 * factor      # fine elements in a dot !
+space = 6 * factor
+thick = 6 * factor
 
 bg = 0.1		#background
 val = 1			#values
 
+soilinput = np.array([[8, 6, 3],[8, 3, 6],[6, 3, 3]])
+soilMatrix = buildcoef2d.soil_converter(soilinput,NFine, BoundarySpace=space)
+print(soilMatrix)
+
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg                  = bg,
                         val                 = val,
-                        length              = 1,
+                        length              = thick,
                         thick               = thick,
                         space               = space,
                         probfactor          = 1,
@@ -68,30 +72,28 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         thickSwitch         = None,
                         equidistant         = True,
                         ChannelHorizontal   = None,
-                        ChannelVertical     = True,
-                        BoundarySpace       = True)
-
+                        ChannelVertical     = None,
+                        BoundarySpace       = True,
+                        soilMatrix          = soilMatrix)
 
 
 # Set reference coefficient
 aFine_ref_shaped = CoefClass.BuildCoefficient()
-aFine_ref_shaped = CoefClass.SpecificMove(Number=np.arange(0,10), steps=4, Right=1)
 aFine_ref = aFine_ref_shaped.flatten()
-
 
 # decision
 valc = np.shape(CoefClass.ShapeRemember)[0]
 numbers = []
-decision = np.zeros(20)
+decision = np.zeros(50)
 decision[0] = 1
-random.seed(10)
+
 
 for i in range(0,valc):
     a = random.sample(list(decision),1)[0]
     if a == 1:
         numbers.append(i)
 
-aFine_with_defects = CoefClass.SpecificVanish(Number = numbers, Original=False).flatten()
+aFine_with_defects = CoefClass.SpecificVanish(Number = numbers).flatten()
 
 '''
 Construct right hand side
@@ -109,11 +111,13 @@ f_ref = f_ref_reshaped.reshape(NpFine)
 '''
 Domain mapping perturbation
 '''
-number_of_channels = len(CoefClass.ShapeRemember)
 
-bending_perturbation = perturbations.MultipleMovingStripes(world, number_of_channels, space, thick, plot_mapping = True)
+bending_perturbation = perturbations.Pinch(world)
 aFine_pert, f_pert = bending_perturbation.computePerturbation(aFine_with_defects, f_ref)
 aFine_trans, f_trans = bending_perturbation.computeTransformation(aFine_with_defects, f_ref)
+
+# aFine_pert, f_pert = aFine_with_defects, f_ref
+# aFine_trans, f_trans = aFine_with_defects, f_ref
 
 
 '''
@@ -225,8 +229,8 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
                                                  correctorsRhsT = correctorRhsT,
                                                  MFull = MFull,
                                                  uFineFull_trans = uFineFull_trans,
-                                                 AFine_trans = AFine_trans)
-                                                 #,StartingTolerance=100)
+                                                 AFine_trans = AFine_trans )
+                                                 # ,StartingTolerance=0)
 
 to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 

@@ -16,7 +16,7 @@ from MasterthesisLOD.visualize import drawCoefficientGrid
 
 import perturbations
 import algorithms
-from gridlod_on_perturbations.data import store_minimal_data
+from gridlod_on_perturbations.data import store_all_data
 
 ROOT = '../../2d_applications/data/HeKeMa_2019/ex2'
 
@@ -128,8 +128,8 @@ drawCoefficient_origin(NFine, aFine_pert)
 plt.figure('transformed')
 drawCoefficient_origin(NFine, aFine_trans)
 
-plt.figure('Right hand side')
-drawCoefficient_origin(NFine+1, f_ref)
+# plt.figure('Right hand side')
+# drawCoefficient_origin(NFine+1, f_ref)
 
 plt.show()
 
@@ -229,7 +229,7 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
 
 to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 
-store_minimal_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD)
+store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans, f_ref)
 
 '''
 Plot solutions

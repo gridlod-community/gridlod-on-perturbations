@@ -44,7 +44,7 @@ Construct diffusion coefficient
 '''
 
 space = 6 * factor
-thick = 3 * factor
+thick = 4 * factor
 
 bg = 0.1		#background
 val = 1			#values
@@ -117,8 +117,8 @@ drawCoefficient_origin(NFine, aFine_ref)
 plt.figure("Perturbed coefficient")
 drawCoefficient_origin(NFine, aFine_trans)
 
-plt.figure('Right hand side')
-drawCoefficient_origin(NFine+1, f_ref)
+# plt.figure('Right hand side')
+# drawCoefficient_origin(NFine+1, f_ref)
 
 plt.show()
 
@@ -208,7 +208,7 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
 
 to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 
-store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans, f_ref, name="test2_perc")
+store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans, f_ref)
 
 '''
 Plot solutions

@@ -214,8 +214,8 @@ class Pinch(PerturbationInterface):
 
         tapering = np.prod(np.sin(np.pi*x), axis=1)
         
-        displacement = np.column_stack([tapering*0.015*(r_bounded)**-2,
-                                        tapering*0.015*(r_bounded)**-2])
+        displacement = np.column_stack([tapering*0.018*(r_bounded)**-2,
+                                        tapering*0.018*(r_bounded)**-2])
         
         self.psi = discrete_mapping.MappingCQ1(NFine, x + displacement)
         
@@ -317,9 +317,9 @@ class MultipleMovingStripes(PerturbationInterface):
         cs = [c * random.sample([-1, 1], 1)[0] for c in cs]
 
         ## or manually
-        # cs[3] = 10
-        # cs[4] = 2
-        # cs[5] = 1
+        cs[3] = -1
+        cs[4] = 0
+        cs[5] = 0
 
         print(cs)
 
