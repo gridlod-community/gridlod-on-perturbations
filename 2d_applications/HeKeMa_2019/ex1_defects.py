@@ -14,9 +14,10 @@ from MasterthesisLOD import buildcoef2d
 from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin
 from MasterthesisLOD.visualize import drawCoefficientGrid
 
-import perturbations
 import algorithms
 from gridlod_on_perturbations.data import store_all_data
+
+from visualization_tools import draw_f, draw_indicator
 
 ROOT = '../../2d_applications/data/HeKeMa_2019/ex1'
 
@@ -25,12 +26,13 @@ ROOT = '../../2d_applications/data/HeKeMa_2019/ex1'
 potenz = 8
 factor = 2**(potenz - 8)
 fine = 2**potenz
-N = 2**5
-NFine = np.array([fine,fine])
-NpFine = np.prod(NFine + 1)
 
+N = 2**5
 print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))))
 k = 4  # goes like log H
+
+NFine = np.array([fine,fine])
+NpFine = np.prod(NFine + 1)
 NWorldCoarse = np.array([N, N])
 
 # boundary Conditions
@@ -43,7 +45,7 @@ world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 Construct diffusion coefficient
 '''
 
-space = 6 * factor
+space = 8 * factor
 thick = 4 * factor
 
 bg = 0.1		#background
@@ -57,16 +59,7 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         space               = space,
                         probfactor          = 1,
                         right               = 1,
-                        down                = 0,
-                        diagr1              = 0,
-                        diagr2              = 0,
-                        diagl1              = 0,
-                        diagl2              = 0,
-                        LenSwitch           = None,
-                        thickSwitch         = None,
                         equidistant         = True,
-                        ChannelHorizontal   = None,
-                        ChannelVertical     = None,
                         BoundarySpace       = True)
 
 
@@ -82,8 +75,6 @@ Construct right hand side
 
 f_ref = np.ones(NpFine) * 0.0001
 f_ref_reshaped = f_ref.reshape(NFine+1)
-# f_ref_reshaped[int(0*fine/8):int(2*fine/8),int(0*fine/8):int(2*fine/8)] = 1
-# f_ref_reshaped[int(6*fine/8):int(8*fine/8),int(6*fine/8):int(8*fine/8)] = 1
 f_ref_reshaped[int(1*fine/8):int(7*fine/8),int(1*fine/8):int(7*fine/8)] = 10
 f_ref = f_ref_reshaped.reshape(NpFine)
 
@@ -117,8 +108,8 @@ drawCoefficient_origin(NFine, aFine_ref)
 plt.figure("Perturbed coefficient")
 drawCoefficient_origin(NFine, aFine_trans)
 
-# plt.figure('Right hand side')
-# drawCoefficient_origin(NFine+1, f_ref)
+plt.figure('Right hand side')
+draw_f(NFine+1, f_ref)
 
 plt.show()
 
@@ -184,10 +175,8 @@ epsCoarse = list(map(computeIndicators, range(world.NtCoarse)))
 '''
 Plot error indicator
 '''
-fig = plt.figure("error indicator")
-ax = fig.add_subplot(1, 1, 1)
 np_eps = np.einsum('i,i -> i', np.ones(np.size(epsCoarse)), epsCoarse)
-drawCoefficientGrid(NWorldCoarse, np_eps, fig, ax, original_style=True, Gridsize=N)
+draw_indicator(NWorldCoarse, np_eps, original_style=True, Gridsize=N)
 
 
 Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,

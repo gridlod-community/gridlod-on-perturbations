@@ -12,11 +12,12 @@ from gridlod.world import World, Patch
 
 from MasterthesisLOD import buildcoef2d
 from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin
-from MasterthesisLOD.visualize import drawCoefficientGrid
 
 import perturbations
 import algorithms
 from gridlod_on_perturbations.data import store_all_data
+
+from visualization_tools import draw_f, draw_indicator
 
 ROOT = '../../2d_applications/data/HeKeMa_2019/ex3'
 
@@ -24,14 +25,13 @@ ROOT = '../../2d_applications/data/HeKeMa_2019/ex3'
 
 factor = 2**0
 fine = 256 * factor
-NFine = np.array([fine,fine])
-NpFine = np.prod(NFine + 1)
 
 N = 2**5
+print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))))
+k = 4  # goes like log H
 
-k = 4
-print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))), '    k = ', k)
-
+NFine = np.array([fine,fine])
+NpFine = np.prod(NFine + 1)
 NWorldCoarse = np.array([N, N])
 
 # boundary Conditions
@@ -46,7 +46,7 @@ Construct diffusion coefficient
 
 ######## These are the only numbers you need to change for the buildcoef2d class
 space = 24 * factor     # fine elements between the dots !
-thick = 4 * factor      # fine elements in a dot !
+thick = 2 * factor      # fine elements in a dot !
 
 bg = 0.1		#background
 val = 1			#values
@@ -59,15 +59,7 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         space               = space,
                         probfactor          = 1,
                         right               = 1,
-                        down                = 0,
-                        diagr1              = 0,
-                        diagr2              = 0,
-                        diagl1              = 0,
-                        diagl2              = 0,
-                        LenSwitch           = None,
-                        thickSwitch         = None,
                         equidistant         = True,
-                        ChannelHorizontal   = None,
                         ChannelVertical     = True,
                         BoundarySpace       = True)
 
@@ -99,8 +91,6 @@ Construct right hand side
 
 f_ref = np.ones(NpFine) * 0.0001
 f_ref_reshaped = f_ref.reshape(NFine+1)
-# f_ref_reshaped[int(0*fine/8):int(2*fine/8),int(0*fine/8):int(2*fine/8)] = 1
-# f_ref_reshaped[int(6*fine/8):int(8*fine/8),int(6*fine/8):int(8*fine/8)] = 1
 f_ref_reshaped[int(1*fine/8):int(7*fine/8),int(1*fine/8):int(7*fine/8)] = 10
 f_ref = f_ref_reshaped.reshape(NpFine)
 
@@ -129,8 +119,9 @@ drawCoefficient_origin(NFine, aFine_pert)
 plt.figure('transformed')
 drawCoefficient_origin(NFine, aFine_trans)
 
-# plt.figure('Right hand side')
-# drawCoefficient_origin(NFine+1, f_ref)
+plt.figure('Right hand side')
+draw_f(NFine+1, f_ref)
+
 
 plt.show()
 
@@ -206,17 +197,16 @@ epsCoarse = list(map(computeIndicators, range(world.NtCoarse)))
 '''
 Plot error indicator
 '''
-fig = plt.figure("error indicator")
-ax = fig.add_subplot(1, 1, 1)
 np_eps = np.einsum('i,i -> i', np.ones(np.size(epsCoarse)), epsCoarse)
-drawCoefficientGrid(NWorldCoarse, np_eps, fig, ax, original_style=True, Gridsize=N)
+draw_indicator(NWorldCoarse, np_eps, original_style=True, Gridsize=N)
+
 
 Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
                                                  k = k ,
                                                  boundaryConditions = boundaryConditions,
                                                  a_Fine_to_be_approximated = a_Fine_to_be_approximated,
                                                  aFine_ref = aFine_ref,
-                                                 f_trans = f_ref,
+                                                 f_trans = f_trans,
                                                  epsCoarse = epsCoarse,
                                                  KmsijT = KmsijT,
                                                  correctorsListT = correctorsListT,
@@ -230,7 +220,7 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
 
 to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 
-store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans, f_ref)
+store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_pert,  f_ref, aFine_trans, f_trans)
 
 '''
 Plot solutions

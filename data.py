@@ -1,16 +1,27 @@
 import csv
+import numpy as np
 
 def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFine, uFineLOD,
-                   NWorldFine, NWorldCoarse, ABase, APert, f_ref, ATrans = None, f_trans = None, name='test'):
+                   NWorldFine, NWorldCoarse, ABase, APert, f_ref, ATrans = None, f_trans = None, np_eft = None, name='test'):
     if ATrans is None:
         ATrans = APert
+    else:
+        ATrans = np.linalg.norm(ATrans, axis=(1, 2), ord=2)
+
     if f_trans is None:
         f_trans = f_ref
+
 
     with open('{}/{}_k{}_H{}_epsCoarse.txt'.format(ROOT, name, k, N), 'w') as csvfile:
         writer = csv.writer(csvfile)
         for val in epsCoarse_DM:
             writer.writerow([val])
+
+    if np_eft is not None:
+        with open('{}/{}_k{}_H{}_eft.txt'.format(ROOT, name, k, N), 'w') as csvfile:
+            writer = csv.writer(csvfile)
+            for val in np_eft:
+                writer.writerow([val])
 
     with open('{}/{}_k{}_H{}_to_be_updated.txt'.format(ROOT, name, k, N), 'w') as csvfile:
         writer = csv.writer(csvfile)
@@ -134,6 +145,7 @@ def store_minimal_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_error
 
 def restore_all_data(ROOT, k, N, name = 'test'):
     epsCoarse_DM = []
+    eft = []
     complete_tol_DM = []
     complete_errors = []
     tmp_errors = []
@@ -143,17 +155,27 @@ def restore_all_data(ROOT, k, N, name = 'test'):
     uFineLOD = []
     NWorldCoarse = []
     NWorldFine = []
-    a_ref = []
-    a_pert = []
-    a_trans = []
-    f_ref = []
-    f_trans = []
+    a_ref = np.array([])
+    a_pert = np.array([])
+    a_trans = np.array([])
+    f_ref = np.array([])
+    f_trans = np.array([])
 
     f = open('{}/{}_k{}_H{}_epsCoarse.txt'.format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
         epsCoarse_DM.append(float(val[0]))
     f.close()
+
+    try:
+        f = open('{}/{}_k{}_H{}_eft.txt'.format(ROOT, name, k, N), 'r')
+        reader = csv.reader(f)
+        for val in reader:
+            eft.append(float(val[0]))
+        f.close()
+        eft_ = True
+    except:
+        eft_ = False
 
     f = open("{}/{}_TOLs_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
@@ -200,50 +222,53 @@ def restore_all_data(ROOT, k, N, name = 'test'):
     f = open("{}/{}_NWorldFine_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
-        NWorldFine.append(float(val[0]))
+        NWorldFine.append(int(val[0]))
     f.close()
 
     #safe NworldCoarse
     f = open("{}/{}_NWorldCoarse_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
-        NWorldCoarse.append(float(val[0]))
+        NWorldCoarse.append(int(val[0]))
     f.close()
 
     #ABase
     f = open("{}/{}_OriginalCoeff_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
-        a_ref.append(float(val[0]))
+        a_ref = np.append(a_ref, [float(val[0])])
     f.close()
 
     # APert
     f = open("{}/{}_PerturbedCoeff_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
-        a_pert.append(float(val[0]))
+        a_pert = np.append(a_pert, [float(val[0])])
     f.close()
 
     f = open("{}/{}_TransformedCoeff_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
-        a_trans.append(float(val[0]))
+        a_trans = np.append(a_trans, [float(val[0])])
     f.close()
 
     # APert
     f = open("{}/{}_f_ref_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
-        f_ref.append(float(val[0]))
+        f_ref = np.append(f_ref, [float(val[0])])
     f.close()
 
     f = open("{}/{}_f_trans_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
-        f_trans.append(float(val[0]))
+        f_trans = np.append(f_trans, [float(val[0])])
     f.close()
 
-    return epsCoarse_DM, complete_tol_DM, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans
+    if eft_:
+        return epsCoarse_DM, complete_tol_DM, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans, eft
+    else:
+        return epsCoarse_DM, complete_tol_DM, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans
 
 
 def restore_minimal_data(ROOT, k, N, name = 'test'):

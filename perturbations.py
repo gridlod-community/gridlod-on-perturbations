@@ -317,6 +317,7 @@ class MultipleMovingStripes(PerturbationInterface):
         cs = [c * random.sample([-1, 1], 1)[0] for c in cs]
 
         ## or manually
+        cs[2] = 0
         cs[3] = -1
         cs[4] = 0
         cs[5] = 0
