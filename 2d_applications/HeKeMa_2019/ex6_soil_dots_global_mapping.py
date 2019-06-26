@@ -20,7 +20,7 @@ from gridlod_on_perturbations.data import store_all_data
 
 from visualization_tools import draw_f, draw_indicator
 
-ROOT = '../../2d_applications/data/HeKeMa_2019/ex4'
+ROOT = '../../2d_applications/data/HeKeMa_2019/ex6'
 
 # Set global variables for the computation
 
@@ -103,7 +103,11 @@ f_ref = f_ref_reshaped.reshape(NpFine)
 Domain mapping perturbation
 '''
 
-bending_perturbation = perturbations.Pinch(world)
+# in order to change psi you can just change those two variables
+area = [0,1]
+bending_factor = 0.5
+
+bending_perturbation = perturbations.BendingInOneArea(world, area=area, bending_factor=bending_factor)
 aFine_pert, f_pert = bending_perturbation.computePerturbation(aFine_with_defects, f_ref)
 aFine_trans, f_trans = bending_perturbation.computeTransformation(aFine_with_defects, f_ref)
 

@@ -38,9 +38,14 @@ def draw_f(N, a):
 
     cmap = plt.cm.hot_r
 
-    plt.imshow(aCube,
-               origin='lower_left',
-               interpolation='none', cmap=cmap)
+    if np.isclose(np.linalg.norm(a),0):
+        plt.imshow(aCube,
+                   origin='lower_left',
+                   interpolation='none', cmap=cmap)
+    else:
+        plt.imshow(aCube,
+                   origin='lower_left',
+                   interpolation='none', cmap=cmap, norm=matplotlib.colors.LogNorm())
     plt.xticks([])
     plt.yticks([])
 
@@ -53,10 +58,18 @@ def draw_indicator(N, a, colorbar=True, original_style = True, Gridsize = 4, str
 
     te = Gridsize
     major_ticks = np.arange(0, te, 1)
-    if original_style:
-        im = ax.imshow(aCube, cmap=cm.hot_r, origin='lower', extent=[0, te, 0, te])
+    if np.isclose(np.linalg.norm(a),0):
+        if original_style:
+            im = ax.imshow(aCube, cmap=cm.hot_r, origin='lower', extent=[0, te, 0, te])
+        else:
+            im = ax.imshow(aCube, cmap=cm.hot_r, extent=[0, te, 0, te])
     else:
-        im = ax.imshow(aCube, cmap=cm.hot_r, extent=[0, te, 0, te])
+        if original_style:
+            im = ax.imshow(aCube, cmap=cm.hot_r, origin='lower', extent=[0, te, 0, te],
+                           norm=matplotlib.colors.LogNorm())
+        else:
+            im = ax.imshow(aCube, cmap=cm.hot_r, extent=[0, te, 0, te], norm=matplotlib.colors.LogNorm())
+
     ax.axis([0, te, 0, te])
     ax.set_xticks(major_ticks)
     ax.set_yticks(major_ticks)

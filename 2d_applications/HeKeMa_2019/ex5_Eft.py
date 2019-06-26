@@ -26,9 +26,9 @@ potenz = 8
 factor = 2**(potenz - 8)
 fine = 2**potenz
 
-N = 2**5
+N = 2**4
 print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))))
-k = 4  # goes like log H
+k = 2  # goes like log H
 
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
@@ -44,7 +44,7 @@ world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 Construct diffusion coefficient
 '''
 
-space = 6 * factor
+space = 3 * factor
 thick = 0 * factor    # This is why the upper coefficient is only background.
 
 bg = 0.1		#background

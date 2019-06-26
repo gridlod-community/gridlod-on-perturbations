@@ -20,7 +20,7 @@ from gridlod_on_perturbations.data import store_all_data
 
 from visualization_tools import draw_f, draw_indicator
 
-ROOT = '../../2d_applications/data/HeKeMa_2019/ex4'
+ROOT = '../../2d_applications/data/HeKeMa_2019/ex7'
 
 # Set global variables for the computation
 
@@ -103,7 +103,7 @@ f_ref = f_ref_reshaped.reshape(NpFine)
 Domain mapping perturbation
 '''
 
-bending_perturbation = perturbations.Pinch(world)
+bending_perturbation = perturbations.Pinch(world, r_min=0.2, displacement_factor=0.015)
 aFine_pert, f_pert = bending_perturbation.computePerturbation(aFine_with_defects, f_ref)
 aFine_trans, f_trans = bending_perturbation.computeTransformation(aFine_with_defects, f_ref)
 

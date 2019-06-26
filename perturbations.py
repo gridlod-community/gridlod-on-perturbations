@@ -197,8 +197,10 @@ class Oscillation(PerturbationInterface):
         self.psi = discrete_mapping.MappingCQ1(NFine, x + displacement)
 
 class Pinch(PerturbationInterface):
-    def __init__(self, world):
+    def __init__(self, world, r_min = 0.05, displacement_factor=0.018):
         super().__init__(world)
+        self.r_min = r_min
+        self.displacement_factor = displacement_factor
         self.create()
 
     def create(self):
@@ -209,13 +211,13 @@ class Pinch(PerturbationInterface):
         x0 = np.array([0.5, 0.5])
 
         r = np.linalg.norm((x-x0), axis=1)
-        r_min = 0.05
+        r_min = self.r_min
         r_bounded = np.maximum(r, r_min)/r_min
 
         tapering = np.prod(np.sin(np.pi*x), axis=1)
         
-        displacement = np.column_stack([tapering*0.018*(r_bounded)**-2,
-                                        tapering*0.018*(r_bounded)**-2])
+        displacement = np.column_stack([tapering*self.displacement_factor*(r_bounded)**-2,
+                                        tapering*self.displacement_factor*(r_bounded)**-2])
         
         self.psi = discrete_mapping.MappingCQ1(NFine, x + displacement)
         
