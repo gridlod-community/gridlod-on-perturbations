@@ -24,11 +24,11 @@ ROOT = '../../2d_applications/data/HeKeMa_2019/ex5'
 
 potenz = 8
 factor = 2**(potenz - 8)
-fine = 2**potenz
+fine = 2**6
 
 N = 2**4
 print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))))
-k = 2  # goes like log H
+k = 4  # goes like log H
 
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
@@ -50,7 +50,7 @@ thick = 0 * factor    # This is why the upper coefficient is only background.
 bg = 0.1		#background
 val = 1			#values
 
-soilinput = np.array([[13, 6, 3]])   # this means 13 rows with space 6 fine elements and dots of size 3 fine elements
+soilinput = np.array([[6, 1, 3]])   # this means 13 rows with space 6 fine elements and dots of size 3 fine elements
 # soilinput = np.array([[13, 3, 6]])   # this means 13 rows with space 3 fine elements and dots of size 6 fine elements
 soilMatrix = buildcoef2d.soil_converter(soilinput, NFine, BoundarySpace=space)
 print(soilMatrix)   #
@@ -64,7 +64,7 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         probfactor          = 1,
                         right               = 1,
                         equidistant         = True,
-                        BoundarySpace       = True,
+                        BoundarySpace       = False,
                         soilMatrix          = soilMatrix)
 
 
@@ -78,8 +78,12 @@ Construct right hand side
 
 f_ref = np.ones(NpFine) * 0.0001
 f_ref_reshaped = f_ref.reshape(NFine+1)
-f_ref_reshaped[int(8*fine/40):int(11*fine/40),int(19*fine/40):int(22*fine/40)] = 10
-f_ref_reshaped[int(30*fine/40):int(33*fine/40),int(19*fine/40):int(22*fine/40)] = 10
+# f_ref_reshaped[int(8*fine/40):int(11*fine/40),int(19*fine/40):int(22*fine/40)] = 10
+# f_ref_reshaped[int(30*fine/40):int(33*fine/40),int(19*fine/40):int(22*fine/40)] = 10
+
+f_ref_reshaped[int(5*fine/20):int(6*fine/20),int(10*fine/20):int(11*fine/20)] = 10
+f_ref_reshaped[int(15*fine/20):int(16*fine/20),int(10*fine/20):int(11*fine/20)] = 10
+
 f_ref = f_ref_reshaped.reshape(NpFine)
 
 
@@ -140,6 +144,7 @@ Compute PGLOD
 '''
 
 def computeKmsij(TInd):
+    print('.', end='', flush=True)
     patch = Patch(world, k, TInd)
     IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
     aPatch = lambda: coef.localizeCoefficient(patch, aFine_ref)
@@ -149,6 +154,7 @@ def computeKmsij(TInd):
     return patch, correctorsList, csi.Kmsij, csi
 
 def computeRmsi(TInd):
+    print('.', end='', flush=True)
     patch = Patch(world, k, TInd)
     IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
     aPatch = lambda: coef.localizeCoefficient(patch, aFine_ref)
@@ -158,34 +164,51 @@ def computeRmsi(TInd):
                                           extractElements=False)]];
 
     correctorRhs = lod.computeElementCorrector(patch, IPatch, aPatch, None, MRhsList)[0]
-    Rmsi = lod.computeRhsCoarseQuantities(patch, correctorRhs, aPatch)
-    return patch, correctorRhs, Rmsi
+    Rmsi, cetaTPrime = lod.computeRhsCoarseQuantities(patch, correctorRhs, aPatch, True)
+
+    eft_patch = Patch(world, 1, TInd)
+    a_eft_Patch = lambda: coef.localizeCoefficient(eft_patch, aFine_ref)
+    etaT = lod.computeSupremumForEf(eft_patch, a_eft_Patch)
+    return patch, correctorRhs, Rmsi, cetaTPrime, etaT
 
 def computeIndicators(TInd):
+    print('.', end='', flush=True)
     aPatch = lambda: coef.localizeCoefficient(patchT[TInd], aFine_ref)
     rPatch = lambda: coef.localizeCoefficient(patchT[TInd], a_Fine_to_be_approximated)
 
     epsCoarse = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
 
-    # E_fT here !
-    E_fT = np.zeros(np.shape(epsCoarse)) # so far only zeros
+    f_ref_patch = f_ref[util.extractElementFine(world.NWorldCoarse,
+                                          world.NCoarseElement,
+                                          patchT[TInd].iElementWorldCoarse,
+                                          extractElements=False)]
+    f_patch = f_ref[util.extractElementFine(world.NWorldCoarse,
+                                          world.NCoarseElement,
+                                          patchT[TInd].iElementWorldCoarse,
+                                          extractElements=False)]
 
-    return epsCoarse, E_fT
+    E_f = lod.computeEftErrorIndicatorCoarse(patchT[TInd], cetaTPrimeT[TInd], etaTT[TInd], aPatch, rPatch, f_ref_patch, f_patch)[0]
+
+    return epsCoarse, E_f
 
 
 
 print('precomputing ....')
 
 # Use mapper to distribute computations (mapper could be the 'map' built-in or e.g. an ipyparallel map)
+print('computing correctors',  end='', flush=True)
 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
-patchT, correctorRhsT, RmsiT = zip(*map(computeRmsi, range(world.NtCoarse)))
-
+print()
+print('computing right hand side correctors',  end='', flush=True)
+patchT, correctorRhsT, RmsiT, cetaTPrimeT, etaTT = zip(*map(computeRmsi, range(world.NtCoarse)))
+print()
 
 RFull = pglod.assemblePatchFunction(world, patchT, RmsiT)
 MFull = fem.assemblePatchMatrix(world.NWorldFine, world.MLocFine)
 
-print('computing error indicators')
+print('computing error indicators',  end='', flush=True)
 epsCoarse, E_fT = zip(*map(computeIndicators, range(world.NtCoarse)))
+print()
 
 '''
 Plot error indicators
@@ -196,46 +219,46 @@ draw_indicator(NWorldCoarse, np_eps, original_style=True, Gridsize=N)
 np_eft = np.einsum('i,i -> i', np.ones(np.size(E_fT)), E_fT)
 draw_indicator(NWorldCoarse, np_eft, original_style=True, Gridsize=N, string='eft')
 
-plt.show()
+# plt.show()
 
-Algorithm = algorithms.AdaptiveAlgorithm(world = world,
-                                                 k = k ,
-                                                 boundaryConditions = boundaryConditions,
-                                                 a_Fine_to_be_approximated = a_Fine_to_be_approximated,
-                                                 aFine_ref = aFine_ref,
-                                                 f_trans = f_trans,
-                                                 epsCoarse = epsCoarse,
-                                                 KmsijT = KmsijT,
-                                                 correctorsListT = correctorsListT,
-                                                 patchT = patchT,
-                                                 RmsijT=RmsiT,
-                                                 correctorsRhsT = correctorRhsT,
-                                                 MFull = MFull,
-                                                 uFineFull_trans = uFineFull_trans,
-                                                 AFine_trans = AFine_trans #)
-                                                 ,StartingTolerance=0)
-
-to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
-
-store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_pert,  f_ref, aFine_trans, f_trans, np_eft)
-
-'''
-Plot solutions
-'''
-fig = plt.figure('Solutions')
-ax = fig.add_subplot(121)
-ax.set_title('Fem Solution to transformed problem',fontsize=6)
-ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
-
-ax = fig.add_subplot(122)
-ax.set_title('PGLOD Solution to transformed problem',fontsize=6)
-ax.imshow(np.reshape(uFineFull_trans_LOD, NFine+1), origin='lower_left')
-
-'''
-Errors
-'''
-energy_norm = np.sqrt(np.dot(uFineFull_trans_LOD, AFine_trans * uFineFull_trans_LOD))
-energy_error = np.sqrt(np.dot((uFineFull_trans - uFineFull_trans_LOD), AFine_trans * (uFineFull_trans - uFineFull_trans_LOD)))
-print("Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error, energy_error/energy_norm))
-
+# Algorithm = algorithms.AdaptiveAlgorithm(world = world,
+#                                                  k = k ,
+#                                                  boundaryConditions = boundaryConditions,
+#                                                  a_Fine_to_be_approximated = a_Fine_to_be_approximated,
+#                                                  aFine_ref = aFine_ref,
+#                                                  f_trans = f_trans,
+#                                                  epsCoarse = epsCoarse,
+#                                                  KmsijT = KmsijT,
+#                                                  correctorsListT = correctorsListT,
+#                                                  patchT = patchT,
+#                                                  RmsijT=RmsiT,
+#                                                  correctorsRhsT = correctorRhsT,
+#                                                  MFull = MFull,
+#                                                  uFineFull_trans = uFineFull_trans,
+#                                                  AFine_trans = AFine_trans #)
+#                                                  ,StartingTolerance=0)
+#
+# to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
+#
+# store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_pert,  f_ref, aFine_trans, f_trans, np_eft)
+#
+# '''
+# Plot solutions
+# '''
+# fig = plt.figure('Solutions')
+# ax = fig.add_subplot(121)
+# ax.set_title('Fem Solution to transformed problem',fontsize=6)
+# ax.imshow(np.reshape(uFineFull_trans, NFine+1), origin='lower_left')
+#
+# ax = fig.add_subplot(122)
+# ax.set_title('PGLOD Solution to transformed problem',fontsize=6)
+# ax.imshow(np.reshape(uFineFull_trans_LOD, NFine+1), origin='lower_left')
+#
+# '''
+# Errors
+# '''
+# energy_norm = np.sqrt(np.dot(uFineFull_trans_LOD, AFine_trans * uFineFull_trans_LOD))
+# energy_error = np.sqrt(np.dot((uFineFull_trans - uFineFull_trans_LOD), AFine_trans * (uFineFull_trans - uFineFull_trans_LOD)))
+# print("Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error, energy_error/energy_norm))
+#
 plt.show()
