@@ -173,7 +173,7 @@ def computeRmsi(TInd):
                                           extractElements=False)]];
 
     correctorRhs = lod.computeElementCorrector(patch, IPatch, aPatch, None, MRhsList)[0]
-    Rmsi = lod.computeRhsCoarseQuantities(patch, correctorRhs, aPatch)
+    Rmsi = lod.computeRhsCoarseQuantities(patch, correctorRhs, aPatch, False)
     return patch, correctorRhs, Rmsi
 
 def computeIndicators(TInd):
@@ -225,7 +225,9 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
 
 to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 
-store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_pert,  f_ref, aFine_trans, f_trans, name='both')
+uFineFull_pert_LOD = bending_perturbation.evaluateSolution(uFineFull_trans_LOD)
+
+store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_pert,  f_ref, aFine_trans, f_trans, uFineFull_pert_LOD, name='both')
 
 '''
 Plot solutions

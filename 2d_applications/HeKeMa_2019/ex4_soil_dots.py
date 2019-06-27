@@ -52,7 +52,7 @@ thick = 6 * factor
 bg = 0.1		#background
 val = 1			#values
 
-soilinput = np.array([[8, 6, 3],[8, 3, 6],[10, 3, 4]])
+soilinput = np.array([[8, 8, 4],[8, 3, 6],[10, 4, 4]])
 soilMatrix = buildcoef2d.soil_converter(soilinput,NFine)
 print(soilMatrix)
 
@@ -65,7 +65,7 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         probfactor          = 1,
                         right               = 1,
                         equidistant         = True,
-                        BoundarySpace       = False,
+                        BoundarySpace       = True,
                         soilMatrix          = soilMatrix)
 
 
@@ -225,7 +225,9 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
 
 to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 
-store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_pert,  f_ref, aFine_trans, f_trans, name='both')
+uFineFull_pert_LOD = bending_perturbation.evaluateSolution(uFineFull_trans_LOD)
+
+store_all_data(ROOT, k, N, epsCoarse, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_pert,  f_ref, aFine_trans, f_trans, uFineFull_pert_LOD=uFineFull_pert_LOD, name='coarser')
 
 '''
 Plot solutions

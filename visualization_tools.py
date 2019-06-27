@@ -37,7 +37,7 @@ def draw_f(N, a):
     plt.clf()
 
     cmap = plt.cm.hot_r
-
+    cmap.set_bad('w')
     if np.isclose(np.linalg.norm(a),0):
         plt.imshow(aCube,
                    origin='lower_left',
@@ -56,19 +56,22 @@ def draw_indicator(N, a, colorbar=True, original_style = True, Gridsize = 4, str
     aCube = a.reshape(N, order ='F')
     aCube = np.ascontiguousarray(aCube.T)
 
+    cmap = cm.hot_r
+    cmap.set_bad('w')
+
     te = Gridsize
     major_ticks = np.arange(0, te, 1)
     if np.isclose(np.linalg.norm(a),0):
         if original_style:
-            im = ax.imshow(aCube, cmap=cm.hot_r, origin='lower', extent=[0, te, 0, te])
+            im = ax.imshow(aCube, cmap=cmap, origin='lower', extent=[0, te, 0, te])
         else:
-            im = ax.imshow(aCube, cmap=cm.hot_r, extent=[0, te, 0, te])
+            im = ax.imshow(aCube, cmap=cmap, extent=[0, te, 0, te])
     else:
         if original_style:
-            im = ax.imshow(aCube, cmap=cm.hot_r, origin='lower', extent=[0, te, 0, te],
+            im = ax.imshow(aCube, cmap=cmap, origin='lower', extent=[0, te, 0, te],
                            norm=matplotlib.colors.LogNorm())
         else:
-            im = ax.imshow(aCube, cmap=cm.hot_r, extent=[0, te, 0, te], norm=matplotlib.colors.LogNorm())
+            im = ax.imshow(aCube, cmap=cmap, extent=[0, te, 0, te], norm=matplotlib.colors.LogNorm())
 
     ax.axis([0, te, 0, te])
     ax.set_xticks(major_ticks)
@@ -76,7 +79,7 @@ def draw_indicator(N, a, colorbar=True, original_style = True, Gridsize = 4, str
     ax.tick_params(axis='both', which='both', bottom=False, top=False, labelbottom=False, right=False, left=False, labelleft=False)
     fig.subplots_adjust(left=0.00, bottom=0.02, right=1, top=0.95, wspace=0.2, hspace=0.2)
     ax.grid(which='both')
-    ax.grid(which='major', linestyle="-", color="grey")
+    ax.grid(which='major', linestyle="-", color="grey", alpha=0.4)
     if colorbar:
         fig.colorbar(im)
 

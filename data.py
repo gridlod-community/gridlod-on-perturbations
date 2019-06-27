@@ -2,7 +2,7 @@ import csv
 import numpy as np
 
 def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFine, uFineLOD,
-                   NWorldFine, NWorldCoarse, ABase, APert, f_ref, ATrans = None, f_trans = None, np_eft = None, name='test'):
+                   NWorldFine, NWorldCoarse, ABase, APert, f_ref, ATrans = None, f_trans = None, np_eft = None, uFineLOD_pert = None, name='test'):
     if ATrans is None:
         ATrans = APert
     else:
@@ -11,6 +11,8 @@ def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, t
     if f_trans is None:
         f_trans = f_ref
 
+    if uFineLOD_pert is None:
+        uFineLOD_pert = uFineLOD
 
     with open('{}/{}_k{}_H{}_epsCoarse.txt'.format(ROOT, name, k, N), 'w') as csvfile:
         writer = csv.writer(csvfile)
@@ -56,6 +58,11 @@ def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, t
     with open('{}/{}_uFineLOD_k{}_H{}.txt'.format(ROOT, name, k, N), 'w') as csvfile:
         writer = csv.writer(csvfile)
         for val in uFineLOD:
+            writer.writerow([val])
+
+    with open('{}/{}_uFineLOD_pert_k{}_H{}.txt'.format(ROOT, name, k, N), 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for val in uFineLOD_pert:
             writer.writerow([val])
 
     with open('{}/{}_NWorldFine_k{}_H{}.txt'.format(ROOT, name, k, N), 'w') as csvfile:
@@ -153,8 +160,9 @@ def restore_all_data(ROOT, k, N, name = 'test'):
     TOLt = []
     uFine = []
     uFineLOD = []
-    NWorldCoarse = []
-    NWorldFine = []
+    uFineLOD_pert = []
+    NWorldCoarse = np.array([])
+    NWorldFine = np.array([])
     a_ref = np.array([])
     a_pert = np.array([])
     a_trans = np.array([])
@@ -219,17 +227,28 @@ def restore_all_data(ROOT, k, N, name = 'test'):
         uFineLOD.append(float(val[0]))
     f.close()
 
+    try:
+        f = open("{}/{}_uFineLOD_pert_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
+        reader = csv.reader(f)
+        for val in reader:
+            uFineLOD_pert.append(float(val[0]))
+        f.close()
+    except:
+        pass
+
     f = open("{}/{}_NWorldFine_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
-        NWorldFine.append(int(val[0]))
+        NWorldFine = np.append(NWorldFine, [np.int(val[0])])
+    NWorldFine = NWorldFine.reshape([1, 2])[0].astype(int)
     f.close()
 
     #safe NworldCoarse
     f = open("{}/{}_NWorldCoarse_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
-        NWorldCoarse.append(int(val[0]))
+        NWorldCoarse = np.append(NWorldCoarse, [int(val[0])])
+    NWorldCoarse = NWorldCoarse.reshape([1,2])[0].astype(int)
     f.close()
 
     #ABase
@@ -328,6 +347,5 @@ def restore_minimal_data(ROOT, k, N, name = 'test'):
     for val in reader:
         uFineLOD.append(float(val[0]))
     f.close()
-
 
     return epsCoarse_DM, to_be_updated, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD
