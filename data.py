@@ -6,7 +6,10 @@ def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, t
     if ATrans is None:
         ATrans = APert
     else:
-        ATrans = np.linalg.norm(ATrans, axis=(1, 2), ord=2)
+        try:
+            ATrans = np.linalg.norm(ATrans, axis=(1, 2), ord=2)
+        except:
+            pass
 
     if f_trans is None:
         f_trans = f_ref

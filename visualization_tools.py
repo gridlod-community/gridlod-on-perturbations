@@ -37,15 +37,16 @@ def draw_f(N, a):
     plt.clf()
 
     cmap = plt.cm.hot_r
-    cmap.set_bad('w')
+
     if np.isclose(np.linalg.norm(a),0):
-        plt.imshow(aCube,
+        im = plt.imshow(aCube,
                    origin='lower_left',
                    interpolation='none', cmap=cmap)
     else:
-        plt.imshow(aCube,
+        im = plt.imshow(aCube,
                    origin='lower_left',
-                   interpolation='none', cmap=cmap, norm=matplotlib.colors.LogNorm())
+                   interpolation='none', cmap=cmap)
+    plt.colorbar()
     plt.xticks([])
     plt.yticks([])
 
@@ -53,6 +54,7 @@ def draw_indicator(N, a, colorbar=True, original_style = True, Gridsize = 4, str
     fig = plt.figure("error indicator {}".format(string))
     ax = fig.add_subplot(1, 1, 1)
 
+    a = np.array([(1e-14 if a_i is 0 else a_i) for a_i in a])
     aCube = a.reshape(N, order ='F')
     aCube = np.ascontiguousarray(aCube.T)
 
@@ -68,10 +70,9 @@ def draw_indicator(N, a, colorbar=True, original_style = True, Gridsize = 4, str
             im = ax.imshow(aCube, cmap=cmap, extent=[0, te, 0, te])
     else:
         if original_style:
-            im = ax.imshow(aCube, cmap=cmap, origin='lower', extent=[0, te, 0, te],
-                           norm=matplotlib.colors.LogNorm())
+            im = ax.imshow(aCube, cmap=cmap, origin='lower', extent=[0, te, 0, te])
         else:
-            im = ax.imshow(aCube, cmap=cmap, extent=[0, te, 0, te], norm=matplotlib.colors.LogNorm())
+            im = ax.imshow(aCube, cmap=cmap, extent=[0, te, 0, te])
 
     ax.axis([0, te, 0, te])
     ax.set_xticks(major_ticks)

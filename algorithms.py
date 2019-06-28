@@ -243,6 +243,7 @@ class PercentageVsErrorAlgorithm:
                 if i not in offset:
                     offset.append(i)
                     Elements_to_be_updated.append(i)
+                    break
         print('... to be updated: {}%'.format(100*np.size(Elements_to_be_updated)/len(self.epsCoarse)), end='') \
             if Printing else 1
 
@@ -283,7 +284,12 @@ class PercentageVsErrorAlgorithm:
         self.epsCoarse = {i: self.epsCoarse[i] for i in range(np.size(self.epsCoarse)) if self.epsCoarse[i] > 0}
         list = [ v for v in self.epsCoarse.values()]
         list.append(0)
-        tols = np.sort(np.unique(list))[::-1]
+        tols = np.sort(list)[::-1]
+
+        # make sure we only update one element all the time
+        for i in range(1,np.size(tols)):
+            if tols[i] == tols[i-1]:
+                tols[i] -= 1e-7
 
         full_percentage = len(self.epsCoarse) / eps_size
 
@@ -335,6 +341,7 @@ class PercentageVsErrorAlgorithm:
             uFineFull_trans_LOD = uLodFine
 
             if self.init:
+                self.init = 0
                 uFineFull_trans_LOD_old = uLodFine
 
             energy_norm = np.sqrt(np.dot(uFineFull_trans_LOD, self.AFine_trans * uFineFull_trans_LOD))
@@ -364,13 +371,176 @@ class PercentageVsErrorAlgorithm:
                 # stop now
                 break
 
-            if tmp_energy_error < 1e-6:
-                if self.init:
-                    self.init = 0
-                else:
-                    # This is sufficient ! but compute once again for 100%
-                    print('local gain is sufficiently small... aborting')
-                    TOL = 0
+        return to_be_updatedT, energy_errorT, tmp_errorT,rel_energy_errorT, TOLt, uFineFull_trans_LOD
+
+
+class PercentageVsErrorAlgorithm_NO_TOLS:
+    def __init__(self, world, k, boundaryConditions, a_Fine_to_be_approximated, aFine_ref, f_trans, epsCoarse, KmsijT,
+                 correctorsListT, patchT, RmsijT, correctorsRhsT, MFull, uFineFull_trans, AFine_trans):
+        self.world = world
+        self.k = k
+        self.boundaryConditions = boundaryConditions
+        self.a_Fine_to_be_approximated = a_Fine_to_be_approximated
+        self.aFine_ref = aFine_ref
+        self.f_trans = f_trans
+        self.epsCoarse = epsCoarse
+        self.KmsijT = KmsijT
+        self.correctorsListT = correctorsListT
+        self.patchT = patchT
+        self.RmsijT = RmsijT
+        self.correctorsRhsT = correctorsRhsT
+        self.MFull = MFull
+        self.uFineFull_trans = uFineFull_trans
+        self.AFine_trans = AFine_trans
+
+        self.init = 1
+
+    def UpdateCorrectors(self, TInd):
+        # print(" UPDATING {}".format(TInd))
+        patch = Patch(self.world, self.k, TInd)
+        IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, self.boundaryConditions)
+        rPatch = lambda: coef.localizeCoefficient(patch, self.a_Fine_to_be_approximated)
+
+        MRhsList = [self.f_trans[util.extractElementFine(self.world.NWorldCoarse,
+                                                  self.world.NCoarseElement,
+                                                  patch.iElementWorldCoarse,
+                                                  extractElements=False)]];
+
+        correctorsList = lod.computeBasisCorrectors(patch, IPatch, rPatch)
+        csi = lod.computeBasisCoarseQuantities(patch, correctorsList, rPatch)
+
+        correctorRhs = lod.computeElementCorrector(patch, IPatch, rPatch, None, MRhsList)[0]
+        Rmsij = lod.computeRhsCoarseQuantities(patch, correctorRhs, rPatch)
+
+        return patch, correctorsList, csi.Kmsij, Rmsij, correctorRhs
+
+    def UpdateNextElement(self, offset= [], Printing = False):
+        print('apply tolerance') if Printing else 1
+        Element_to_be_updated = []
+        for (i,eps) in self.epsCoarse.items():
+            if i not in offset:
+                offset.append(i)
+                Element_to_be_updated.append(i)
+                break
+        print('... to be updated: {}%'.format(100*np.size(offset)/len(self.epsCoarse)), end='') \
+            if Printing else 1
+
+        if np.size(Element_to_be_updated) != 0:
+            # assert(np.size(Elements_to_be_updated) == 1 or np.size(Elements_to_be_updated) == 2) # sometimes we get
+            print('... update correctors') if Printing else 1
+            patchT_irrelevant, correctorsListTNew, KmsijTNew, RmsijTNew, correctorsRhsNew = zip(*map(self.UpdateCorrectors,
+                                                                                 Element_to_be_updated))
+
+            print('replace Kmsij and update correctorsListT') if Printing else 1
+            RmsijT_list = list(np.copy(self.RmsijT))
+            correctorsRhs_list = list(np.copy(self.correctorsRhsT))
+            KmsijT_list = list(np.copy(self.KmsijT))
+            correctorsListT_list = list(np.copy(self.correctorsListT))
+            i = 0
+            for T in Element_to_be_updated:
+                KmsijT_list[T] = KmsijTNew[i]
+                correctorsListT_list[T] = correctorsListTNew[i]
+                RmsijT_list[T] = RmsijTNew[i]
+                correctorsRhs_list[T] = correctorsRhsNew[i]
+                i += 1
+
+            self.KmsijT = tuple(KmsijT_list)
+            self.correctorsListT = tuple(correctorsListT_list)
+            self.RmsijT = tuple(RmsijT_list)
+            self.correctorsRhsT = tuple(correctorsRhs_list)
+
+            return offset
+        else:
+            print('... there is nothing to be updated') if Printing else 1
+            return offset
+
+    def StartAlgorithm(self):
+        assert(self.init)    # only start the algorithm once
+
+        # in case not every element is affected, the percentage would be missleading.
+        eps_size = np.size(self.epsCoarse)
+        self.epsCoarse = {i: self.epsCoarse[i] for i in range(np.size(self.epsCoarse)) if self.epsCoarse[i] > 0}
+
+        full_percentage = len(self.epsCoarse) / eps_size
+
+        world = self.world
+        print('starting algorithm ...... ')
+
+        TOLt = []
+        to_be_updatedT = []
+        energy_errorT = []
+        rel_energy_errorT = []
+        tmp_errorT = []
+
+        offset = []
+        TOL = 100   # not relevant
+
+        for i in range(len(self.epsCoarse)+1):
+            if self.init:
+                pass
+            else:
+                offset = self.UpdateNextElement(offset, Printing=False)
+
+            if self.init:
+                to_be_updated = np.size(offset) / len(self.epsCoarse) * 100
+                to_be_updatedT.append(to_be_updated)
+                pass
+            else:
+                to_be_updated = np.size(offset) / len(self.epsCoarse) * 100
+                to_be_updatedT.append(to_be_updated * full_percentage)
+
+            KFull = pglod.assembleMsStiffnessMatrix(world, self.patchT, self.KmsijT)
+            RFull = pglod.assemblePatchFunction(world, self.patchT, self.RmsijT)
+            Rf = pglod.assemblePatchFunction(world, self.patchT, self.correctorsRhsT)
+
+            basis = fem.assembleProlongationMatrix(world.NWorldCoarse, world.NCoarseElement)
+
+            bFull = basis.T * self.MFull * self.f_trans - RFull
+
+            basisCorrectors = pglod.assembleBasisCorrectors(world, self.patchT, self.correctorsListT)
+            modifiedBasis = basis - basisCorrectors
+
+            uFull, _ = pglod.solve(world, KFull, bFull, self.boundaryConditions)
+
+            uLodFine = modifiedBasis * uFull
+            uLodFine += Rf
+
+            uFineFull_trans_LOD = uLodFine
+
+            if self.init:
+                uFineFull_trans_LOD_old = uLodFine
+
+            energy_norm = np.sqrt(np.dot(uFineFull_trans_LOD, self.AFine_trans * uFineFull_trans_LOD))
+            # tmp_error
+            tmp_energy_error = np.sqrt(
+                np.dot((uFineFull_trans_LOD - uFineFull_trans_LOD_old),
+                       self.AFine_trans * (uFineFull_trans_LOD - uFineFull_trans_LOD_old)))
+
+
+            # actual error
+            energy_error = np.sqrt(
+                np.dot((uFineFull_trans_LOD - self.uFineFull_trans),
+                       self.AFine_trans * (uFineFull_trans_LOD - self.uFineFull_trans)))
+
+            uFineFull_trans_LOD_old = uFineFull_trans_LOD
+
+            if self.init:
+                self.init = 0
+                print(
+                    ' step({:3d}/{})  T: {}  updates: {:7.3f}%, energy error: {:f}, tmp_error: {:f}, relative energy error: {:f}'.format(
+                        i, len(self.epsCoarse), ' - ',
+                        to_be_updated * full_percentage,
+                        energy_error,
+                        tmp_energy_error, energy_error / energy_norm))
+            else:
+                print(' step({:3d}/{})  T: {:3d}  updates: {:7.3f}%, energy error: {:f}, tmp_error: {:f}, relative energy error: {:f}'.format(i, len(self.epsCoarse), offset[-1],
+                                                                                       to_be_updated * full_percentage,
+                                                                                       energy_error,
+                                                                                       tmp_energy_error, energy_error/energy_norm))
+
+            rel_energy_errorT.append(energy_error/energy_norm)
+            energy_errorT.append(energy_error)
+            tmp_errorT.append(tmp_energy_error)
 
 
         return to_be_updatedT, energy_errorT, tmp_errorT,rel_energy_errorT, TOLt, uFineFull_trans_LOD
