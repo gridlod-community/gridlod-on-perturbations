@@ -3,22 +3,24 @@
 # Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 
+import random
 import numpy as np
 import matplotlib.pyplot as plt
-import random
 
 from gridlod import util, femsolver, interp, coef, fem, lod, pglod
 from gridlod.world import World, Patch
 
 from MasterthesisLOD import buildcoef2d
 from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin
+from MasterthesisLOD.visualize import drawCoefficientGrid
 
+import perturbations
 import algorithms
 from gridlod_on_perturbations.data import store_all_data
 
 from visualization_tools import draw_f, draw_indicator
 
-ROOT = '../../2d_applications/data/HeKeMa_2019/ex1'
+ROOT = '../../2d_applications/data/HeKeMa_2019/ex2'
 
 # Set global variables for the computation
 
@@ -26,8 +28,8 @@ potenz = 8
 factor = 2**(potenz - 8)
 fine = 2**potenz
 
-store = True
 name = 'test'
+store = True
 N = 2**5
 print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))))
 k = 4  # goes like log H
@@ -46,11 +48,15 @@ world = World(NWorldCoarse, NCoarseElement, boundaryConditions)
 Construct diffusion coefficient
 '''
 
-space = 8 * factor
-thick = 4 * factor
+space = 3 * factor
+thick = 6 * factor
 
 bg = 0.1		#background
 val = 1			#values
+
+soilinput = np.array([[8, 8, 4],[8, 3, 6],[10, 4, 4]])
+soilMatrix = buildcoef2d.soil_converter(soilinput,NFine)
+# print(soilMatrix)
 
 CoefClass = buildcoef2d.Coefficient2d(NFine,
                         bg                  = bg,
@@ -61,30 +67,13 @@ CoefClass = buildcoef2d.Coefficient2d(NFine,
                         probfactor          = 1,
                         right               = 1,
                         equidistant         = True,
-                        BoundarySpace       = True)
+                        BoundarySpace       = True,
+                        soilMatrix          = soilMatrix)
 
 
 # Set reference coefficient
 aFine_ref_shaped = CoefClass.BuildCoefficient()
-# I want to have the dots in the middle of the domain.
-aFine_ref = CoefClass.SpecificMove(Number=np.arange(CoefClass.shapecounter), Right=1 , steps=4).flatten()
-
-print('number of dots: {}'.format(np.shape(CoefClass.ShapeRemember)[0]))
-
-'''
-Construct right hand side
-'''
-
-f_ref = np.ones(NpFine) * 0.0001
-f_ref_reshaped = f_ref.reshape(NFine+1)
-f_ref_reshaped[int(1*fine/8):int(7*fine/8),int(1*fine/8):int(7*fine/8)] = 10
-f_ref = f_ref_reshaped.reshape(NpFine)
-
-f_trans = f_ref
-
-'''
-Perturbation using buildcoef2d
-'''
+aFine_ref = aFine_ref_shaped.flatten()
 
 # decision
 valc = np.shape(CoefClass.ShapeRemember)[0]
@@ -98,8 +87,31 @@ for i in range(0,valc):
     if a == 1:
         numbers.append(i)
 
-# ATTENTION : In this case TRANS means PERTURBED
-aFine_trans = CoefClass.SpecificVanish(Number = numbers, Original=False).flatten()
+aFine_with_defects = CoefClass.SpecificVanish(Number = numbers).flatten()
+# aFine_with_defects = aFine_ref
+
+'''
+Construct right hand side
+'''
+
+f_ref = np.ones(NpFine) * 0.0001
+f_ref_reshaped = f_ref.reshape(NFine+1)
+f_ref_reshaped[int(1*fine/8):int(7*fine/8),int(1*fine/8):int(7*fine/8)] = 10
+f_ref = f_ref_reshaped.reshape(NpFine)
+
+
+
+'''
+Domain mapping perturbation
+'''
+
+bending_perturbation = perturbations.Pinch(world)
+aFine_pert, f_pert = bending_perturbation.computePerturbation(aFine_with_defects, f_ref)
+aFine_trans, f_trans = bending_perturbation.computeTransformation(aFine_with_defects, f_ref)
+
+# aFine_pert, f_pert = aFine_with_defects, f_ref
+# aFine_trans, f_trans = aFine_with_defects, f_ref
+
 
 '''
 Plot diffusion coefficient and right hand side
@@ -109,6 +121,9 @@ plt.figure("Coefficient")
 drawCoefficient_origin(NFine, aFine_ref)
 
 plt.figure("Perturbed coefficient")
+drawCoefficient_origin(NFine, aFine_pert)
+
+plt.figure('transformed')
 drawCoefficient_origin(NFine, aFine_trans)
 
 plt.figure('Right hand side')
@@ -117,11 +132,19 @@ draw_f(NFine+1, f_ref)
 plt.show()
 
 '''
-Compute FEM
+Check whether domain mapping method works sufficiently good
 '''
 
-uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_ref, None, boundaryConditions)
+uFineFull_pert, AFine_pert, _ = femsolver.solveFine(world, aFine_pert, f_pert, None, boundaryConditions)
+uFineFull_trans, AFine_trans, _ = femsolver.solveFine(world, aFine_trans, f_trans, None, boundaryConditions)
 
+u_FineFull_trans_pert = bending_perturbation.evaluateSolution(uFineFull_trans)
+
+energy_norm = np.sqrt(np.dot(uFineFull_pert, AFine_pert * uFineFull_pert))
+energy_error = np.sqrt(np.dot((u_FineFull_trans_pert - uFineFull_pert),
+                              AFine_pert * (u_FineFull_trans_pert - uFineFull_pert)))
+print("Domain Mapping with FEM: Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error,
+                                                       energy_error / energy_norm))
 
 '''
 Set the coefficient that we want to approximate and the tolerance
@@ -212,7 +235,6 @@ draw_indicator(NWorldCoarse, np_eft, original_style=True, Gridsize=N, string='ef
 
 plt.show()
 
-
 Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
                                                  k = k ,
                                                  boundaryConditions = boundaryConditions,
@@ -227,14 +249,15 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
                                                  correctorsRhsT = correctorRhsT,
                                                  MFull = MFull,
                                                  uFineFull_trans = uFineFull_trans,
-                                                 AFine_trans = AFine_trans)
+                                                 AFine_trans = AFine_trans )
+                                                 # ,StartingTolerance=0)
 
-to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
+to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
+
+uFineFull_pert_LOD = bending_perturbation.evaluateSolution(uFineFull_trans_LOD)
 
 if store:
-    store_all_data(ROOT, k, N, E_vh, to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans,  f_ref, aFine_trans, f_trans, np_eft = np_eft, name=name)
-
-store_all_data(ROOT, k, N, E_vh, to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans, f_ref)
+    store_all_data(ROOT, k, N, E_vh, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_pert,  f_ref, aFine_trans, f_trans, np_eft = np_eft, uFineLOD_pert=uFineFull_pert_LOD, name=name)
 
 '''
 Plot solutions

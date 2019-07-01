@@ -1,7 +1,7 @@
 import csv
 import numpy as np
 
-def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFine, uFineLOD,
+def store_all_data(ROOT, k, N, E_vh_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFine, uFineLOD,
                    NWorldFine, NWorldCoarse, ABase, APert, f_ref, ATrans = None, f_trans = None, np_eft = None, uFineLOD_pert = None, name='test'):
     if ATrans is None:
         ATrans = APert
@@ -17,9 +17,9 @@ def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, t
     if uFineLOD_pert is None:
         uFineLOD_pert = uFineLOD
 
-    with open('{}/{}_k{}_H{}_epsCoarse.txt'.format(ROOT, name, k, N), 'w') as csvfile:
+    with open('{}/{}_k{}_H{}_E_vh.txt'.format(ROOT, name, k, N), 'w') as csvfile:
         writer = csv.writer(csvfile)
-        for val in epsCoarse_DM:
+        for val in E_vh_DM:
             writer.writerow([val])
 
     if np_eft is not None:
@@ -110,11 +110,11 @@ def store_all_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, t
             writer.writerow([val])
 
 
-def store_minimal_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFine,
+def store_minimal_data(ROOT, k, N, E_vh_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFine,
                        uFineLOD, name = 'test'):
-    with open('{}/{}_k{}_H{}_epsCoarse.txt'.format(ROOT, name, k, N), 'w') as csvfile:
+    with open('{}/{}_k{}_H{}_E_vh.txt'.format(ROOT, name, k, N), 'w') as csvfile:
         writer = csv.writer(csvfile)
-        for val in epsCoarse_DM:
+        for val in E_vh_DM:
             writer.writerow([val])
 
     with open('{}/{}_k{}_H{}_to_be_updated.txt'.format(ROOT ,name, k, N), 'w') as csvfile:
@@ -154,7 +154,7 @@ def store_minimal_data(ROOT, k, N, epsCoarse_DM, to_be_updatedT_DM, energy_error
 
 
 def restore_all_data(ROOT, k, N, name = 'test'):
-    epsCoarse_DM = []
+    E_vh_DM = []
     eft = []
     complete_tol_DM = []
     complete_errors = []
@@ -172,10 +172,10 @@ def restore_all_data(ROOT, k, N, name = 'test'):
     f_ref = np.array([])
     f_trans = np.array([])
 
-    f = open('{}/{}_k{}_H{}_epsCoarse.txt'.format(ROOT, name, k, N), 'r')
+    f = open('{}/{}_k{}_H{}_E_vh.txt'.format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
-        epsCoarse_DM.append(float(val[0]))
+        E_vh_DM.append(float(val[0]))
     f.close()
 
     try:
@@ -288,13 +288,13 @@ def restore_all_data(ROOT, k, N, name = 'test'):
     f.close()
 
     if eft_:
-        return epsCoarse_DM, complete_tol_DM, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans, eft
+        return E_vh_DM, complete_tol_DM, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans, eft
     else:
-        return epsCoarse_DM, complete_tol_DM, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans
+        return E_vh_DM, complete_tol_DM, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans
 
 
 def restore_minimal_data(ROOT, k, N, name = 'test'):
-    epsCoarse_DM = []
+    E_vh_DM = []
     to_be_updated = []
     complete_errors = []
     tmp_errors = []
@@ -303,10 +303,10 @@ def restore_minimal_data(ROOT, k, N, name = 'test'):
     uFine = []
     uFineLOD = []
 
-    f = open('{}/{}_k{}_H{}_epsCoarse.txt'.format(ROOT, name, k, N), 'r')
+    f = open('{}/{}_k{}_H{}_E_vh.txt'.format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
     for val in reader:
-        epsCoarse_DM.append(float(val[0]))
+        E_vh_DM.append(float(val[0]))
     f.close()
 
     f = open("{}/{}_TOLs_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
@@ -351,4 +351,4 @@ def restore_minimal_data(ROOT, k, N, name = 'test'):
         uFineLOD.append(float(val[0]))
     f.close()
 
-    return epsCoarse_DM, to_be_updated, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD
+    return E_vh_DM, to_be_updated, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD

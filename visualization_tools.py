@@ -50,7 +50,7 @@ def draw_f(N, a):
     plt.xticks([])
     plt.yticks([])
 
-def draw_indicator(N, a, colorbar=True, original_style = True, Gridsize = 4, string=''):
+def draw_indicator(N, a, colorbar=True, original_style = True, Gridsize = 4, string='', logplot = True):
     fig = plt.figure("error indicator {}".format(string))
     ax = fig.add_subplot(1, 1, 1)
 
@@ -69,10 +69,17 @@ def draw_indicator(N, a, colorbar=True, original_style = True, Gridsize = 4, str
         else:
             im = ax.imshow(aCube, cmap=cmap, extent=[0, te, 0, te])
     else:
-        if original_style:
-            im = ax.imshow(aCube, cmap=cmap, origin='lower', extent=[0, te, 0, te])
+        if logplot:
+            if original_style:
+                im = ax.imshow(aCube, cmap=cmap, origin='lower', extent=[0, te, 0, te],
+                               norm=matplotlib.colors.LogNorm())
+            else:
+                im = ax.imshow(aCube, cmap=cmap, extent=[0, te, 0, te], norm=matplotlib.colors.LogNorm())
         else:
-            im = ax.imshow(aCube, cmap=cmap, extent=[0, te, 0, te])
+            if original_style:
+                im = ax.imshow(aCube, cmap=cmap, origin='lower', extent=[0, te, 0, te])
+            else:
+                im = ax.imshow(aCube, cmap=cmap, extent=[0, te, 0, te])
 
     ax.axis([0, te, 0, te])
     ax.set_xticks(major_ticks)

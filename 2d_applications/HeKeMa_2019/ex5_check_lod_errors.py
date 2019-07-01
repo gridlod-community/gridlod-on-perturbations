@@ -217,10 +217,10 @@ print()
 Plot error indicators
 '''
 np_eps = np.einsum('i,i -> i', np.ones(np.size(epsCoarse)), epsCoarse)
-draw_indicator(NWorldCoarse, np_eps, original_style=True, Gridsize=N)
+draw_indicator(NWorldCoarse, np_eps, original_style=True, Gridsize=N, logplot=False)
 
 np_eft = np.einsum('i,i -> i', np.ones(np.size(E_fT)), E_fT)
-draw_indicator(NWorldCoarse, np_eft, original_style=True, Gridsize=N, string='eft')
+draw_indicator(NWorldCoarse, np_eft, original_style=True, Gridsize=N, string='eft', logplot=False)
 
 # plt.show()
 
