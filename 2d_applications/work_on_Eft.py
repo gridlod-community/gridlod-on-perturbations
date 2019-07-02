@@ -18,8 +18,6 @@ from gridlod_on_perturbations.data import store_all_data
 
 from visualization_tools import draw_f, draw_indicator
 
-ROOT = '../../2d_applications/data/HeKeMa_2019/ex1'
-
 # Set global variables for the computation
 
 potenz = 8
@@ -231,10 +229,6 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
 
 to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 
-if store:
-    store_all_data(ROOT, k, N, E_vh, to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans,  f_ref, aFine_trans, f_trans, np_eft = np_eft, name=name)
-
-store_all_data(ROOT, k, N, E_vh, to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans, f_ref)
 
 '''
 Plot solutions

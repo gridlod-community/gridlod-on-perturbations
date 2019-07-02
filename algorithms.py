@@ -289,7 +289,7 @@ class PercentageVsErrorAlgorithm:
         list.append(0)
         tols = np.sort(list)[::-1]
 
-        eps_size = np.size(self.E_vh)
+        eps_size_f = np.size(self.E_vh)
         self.E_f = {i: self.E_f[i] for i in range(np.size(self.E_f)) if self.E_f[i] > 0}
         list_f = [ v for v in self.E_f.values()]
         list_f.append(0)
@@ -305,7 +305,7 @@ class PercentageVsErrorAlgorithm:
                 tols_f[i] -= 1e-7
 
         full_percentage = len(self.E_vh) / eps_size
-        full_percentage_f = len(self.E_f) / eps_size
+        full_percentage_f = len(self.E_f) / eps_size_f
 
         world = self.world
         print('starting algorithm ...... ')
