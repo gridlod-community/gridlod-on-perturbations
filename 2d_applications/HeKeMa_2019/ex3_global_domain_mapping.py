@@ -97,7 +97,7 @@ Construct right hand side
 
 f_ref = np.zeros(NpFine)
 f_ref_reshaped = f_ref.reshape(NFine+1)
-f_ref_reshaped[int(2*fine/8)+1:int(6*fine/8),int(2*fine/8)+1:int(6*fine/8)] = 1
+f_ref_reshaped[int(1*fine/8)+1:int(7*fine/8),int(1*fine/8)+1:int(7*fine/8)] = 1
 f_ref = f_ref_reshaped.reshape(NpFine)
 
 
@@ -130,6 +130,12 @@ drawCoefficient_origin(NFine, aFine_trans)
 
 plt.figure('Right hand side')
 draw_f(NFine+1, f_ref)
+
+plt.figure('Right hand side trans')
+draw_f(NFine+1, f_trans)
+
+plt.figure('Right hand side pert')
+draw_f(NFine+1, f_pert)
 
 plt.show()
 

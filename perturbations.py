@@ -29,8 +29,8 @@ class PerturbationInterface:
         self.checkInvertible(xpFine_pert, xpFine)
 
         aFine_pert = func.evaluateDQ0(NFine, aFine, xtFine_ref)
-        f_pert = func.evaluateCQ1(NFine, f_ref, xpFine_ref)
-        return aFine_pert, f_pert
+        # f_pert = func.evaluateCQ1(NFine, f_ref, xpFine_ref)
+        return aFine_pert, f_ref
 
     def checkInvertible(self, aFine, aBack):
         if np.allclose(aBack, aFine):
@@ -50,11 +50,16 @@ class PerturbationInterface:
 
         NFine = self.world.NWorldFine
         xtFine = util.tCoordinates(NFine)
-        xpFine = util.pCoordinates(NFine)
 
         a_trans = np.einsum('tij, t, tkj, t -> tik', psi.Jinv(xtFine), aFine, psi.Jinv(xtFine),
                                 psi.detJ(xtFine))
-        f_trans = np.einsum('t, t -> t', f_ref, psi.detJ(xpFine))
+
+        xpFine = util.pCoordinates(NFine)
+        xpFine_pert = self.psi.evaluate(xpFine)
+
+        f_trans = func.evaluateCQ1(NFine, f_ref, xpFine_pert)
+
+        f_trans = np.einsum('t, t -> t', f_trans, psi.detJ(xpFine_pert))
 
         return a_trans, f_trans
 

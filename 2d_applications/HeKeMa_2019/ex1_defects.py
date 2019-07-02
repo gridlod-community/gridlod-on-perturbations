@@ -76,9 +76,9 @@ print('number of dots: {}'.format(CoefClass.shapecounter))
 Construct right hand side
 '''
 
-f_ref = np.zeros(NpFine) * 0.0001
+f_ref = np.zeros(NpFine)
 f_ref_reshaped = f_ref.reshape(NFine+1)
-f_ref_reshaped[int(2*fine/8)+1:int(6*fine/8),int(2*fine/8)+1:int(6*fine/8)] = 1
+f_ref_reshaped[int(1*fine/8)+1:int(7*fine/8),int(1*fine/8)+1:int(7*fine/8)] = 1
 f_ref = f_ref_reshaped.reshape(NpFine)
 
 f_trans = f_ref
