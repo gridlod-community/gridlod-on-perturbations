@@ -28,9 +28,9 @@ fine = 2**potenz
 
 store = True
 name = 'test'
-N = 2**2
+N = 2**5
 print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))))
-k = 2  # goes like log H
+k = 4  # goes like log H
 
 NFine = np.array([fine,fine])
 NpFine = np.prod(NFine + 1)
@@ -78,7 +78,7 @@ Construct right hand side
 
 f_ref = np.zeros(NpFine) * 0.0001
 f_ref_reshaped = f_ref.reshape(NFine+1)
-f_ref_reshaped[int(2*fine/8):int(6*fine/8),int(2*fine/8):int(6*fine/8)] = 10
+f_ref_reshaped[int(2*fine/8)+1:int(6*fine/8),int(2*fine/8)+1:int(6*fine/8)] = 1
 f_ref = f_ref_reshaped.reshape(NpFine)
 
 f_trans = f_ref
@@ -157,8 +157,6 @@ def computeRmsi(TInd):
     correctorRhs = lod.computeElementCorrector(patch, IPatch, aPatch, None, MRhsList)[0]
     Rmsi, cetaTPrime = lod.computeRhsCoarseQuantities(patch, correctorRhs, aPatch, True)
 
-    eft_patch = Patch(world, 1, TInd)
-    a_eft_Patch = lambda: coef.localizeCoefficient(eft_patch, aFine_ref)
     return patch, correctorRhs, Rmsi, cetaTPrime
 
 def computeIndicators(TInd):

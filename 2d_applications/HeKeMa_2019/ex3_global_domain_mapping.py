@@ -95,9 +95,9 @@ aFine_with_defects = CoefClass.SpecificVanish(Number = numbers).flatten()
 Construct right hand side
 '''
 
-f_ref = np.ones(NpFine) * 0.0001
+f_ref = np.zeros(NpFine)
 f_ref_reshaped = f_ref.reshape(NFine+1)
-f_ref_reshaped[int(1*fine/8):int(7*fine/8),int(1*fine/8):int(7*fine/8)] = 10
+f_ref_reshaped[int(2*fine/8)+1:int(6*fine/8),int(2*fine/8)+1:int(6*fine/8)] = 1
 f_ref = f_ref_reshaped.reshape(NpFine)
 
 
@@ -181,10 +181,7 @@ def computeRmsi(TInd):
     correctorRhs = lod.computeElementCorrector(patch, IPatch, aPatch, None, MRhsList)[0]
     Rmsi, cetaTPrime = lod.computeRhsCoarseQuantities(patch, correctorRhs, aPatch, True)
 
-    eft_patch = Patch(world, 1, TInd)
-    a_eft_Patch = lambda: coef.localizeCoefficient(eft_patch, aFine_ref)
-    etaT = lod.computeSupremumForEf(eft_patch, a_eft_Patch)
-    return patch, correctorRhs, Rmsi, cetaTPrime, etaT
+    return patch, correctorRhs, Rmsi, cetaTPrime
 
 def computeIndicators(TInd):
     print('.', end='', flush=True)
@@ -203,7 +200,7 @@ def computeIndicators(TInd):
                                           patchT[TInd].iElementWorldCoarse,
                                           extractElements=False)]
 
-    E_f = lod.computeEftErrorIndicatorCoarse(patchT[TInd], cetaTPrimeT[TInd], etaTT[TInd], aPatch, rPatch, f_ref_patch, f_patch)
+    E_f = lod.computeEftErrorIndicatorCoarse(patchT[TInd], cetaTPrimeT[TInd], aPatch, rPatch, f_ref_patch, f_patch)
 
     return E_vh, E_f
 
@@ -216,7 +213,7 @@ print('computing correctors',  end='', flush=True)
 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 print()
 print('computing right hand side correctors',  end='', flush=True)
-patchT, correctorRhsT, RmsiT, cetaTPrimeT, etaTT = zip(*map(computeRmsi, range(world.NtCoarse)))
+patchT, correctorRhsT, RmsiT, cetaTPrimeT = zip(*map(computeRmsi, range(world.NtCoarse)))
 print()
 
 RFull = pglod.assemblePatchFunction(world, patchT, RmsiT)
