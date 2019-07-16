@@ -107,12 +107,19 @@ Domain mapping perturbation
 '''
 
 area=[0,1]
-bending_factor = 0.5
+bending_factor = 0.25
 
 bending_perturbation = perturbations.BendingInOneArea(world, area=area, bending_factor=bending_factor)
 aFine_pert, f_pert = bending_perturbation.computePerturbation(aFine_with_defects, f_ref)
 aFine_trans, f_trans = bending_perturbation.computeTransformation(aFine_with_defects, f_ref)
 
+'''
+compute norm of f
+'''
+
+MFull = fem.assemblePatchMatrix(world.NWorldFine, world.MLocFine)
+norm_of_f = [np.sqrt(np.dot(f_trans, MFull * f_trans))]
+print('Norm of f is {}'.format(norm_of_f[0]))
 
 
 '''
@@ -195,6 +202,7 @@ def computeIndicators(TInd):
     rPatch = lambda: coef.localizeCoefficient(patchT[TInd], a_Fine_to_be_approximated)
 
     E_vh = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
+    E_vh *= norm_of_f[0]
 
     # this is new for E_ft
     f_ref_patch = f_ref[util.extractElementFine(world.NWorldCoarse,
@@ -206,9 +214,9 @@ def computeIndicators(TInd):
                                           patchT[TInd].iElementWorldCoarse,
                                           extractElements=False)]
 
-    E_f = lod.computeEftErrorIndicatorCoarse(patchT[TInd], cetaTPrimeT[TInd], aPatch, rPatch, f_ref_patch, f_patch)
+    E_f, E_Rf = lod.computeEftErrorIndicatorsCoarse(patchT[TInd], cetaTPrimeT[TInd], aPatch, rPatch, f_ref_patch, f_patch)
 
-    return E_vh, E_f
+    return E_vh, E_f, E_Rf
 
 
 
@@ -223,22 +231,28 @@ patchT, correctorRhsT, RmsiT, cetaTPrimeT = zip(*map(computeRmsi, range(world.Nt
 print()
 
 RFull = pglod.assemblePatchFunction(world, patchT, RmsiT)
-MFull = fem.assemblePatchMatrix(world.NWorldFine, world.MLocFine)
 
 print('computing error indicators',  end='', flush=True)
-E_vh, E_fT = zip(*map(computeIndicators, range(world.NtCoarse)))
+E_vh, E_fT, E_RfT = zip(*map(computeIndicators, range(world.NtCoarse)))
 print()
+
 
 '''
 Plot error indicators
 '''
+
 np_eps = np.einsum('i,i -> i', np.ones(np.size(E_vh)), E_vh)
 draw_indicator(NWorldCoarse, np_eps, original_style=True, Gridsize=N)
 
 np_eft = np.einsum('i,i -> i', np.ones(np.size(E_fT)), E_fT)
 draw_indicator(NWorldCoarse, np_eft, original_style=True, Gridsize=N, string='eft')
 
+np_eRft = np.einsum('i,i -> i', np.ones(np.size(E_RfT)), E_RfT)
+draw_indicator(NWorldCoarse, np_eRft, original_style=True, Gridsize=N, string='eRft')
+
+
 plt.show()
+
 
 Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
                                                  k = k ,
@@ -262,7 +276,7 @@ to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_tr
 uFineFull_pert_LOD = bending_perturbation.evaluateSolution(uFineFull_trans_LOD)
 
 if store:
-    store_all_data(ROOT, k, N, E_vh, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_pert,  f_ref, aFine_trans, f_trans, np_eft = np_eft, uFineLOD_pert=uFineFull_pert_LOD, name=name)
+    store_all_data(ROOT, k, N, E_vh, np_eft, np_eRft, norm_of_f, to_be_updatedT, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_pert,  f_ref, aFine_trans, f_trans, uFineLOD_pert=uFineFull_pert_LOD, name=name)
 
 '''
 Plot solutions

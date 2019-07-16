@@ -84,6 +84,15 @@ f_ref = f_ref_reshaped.reshape(NpFine)
 f_trans = f_ref
 
 '''
+compute norm of f
+'''
+
+MFull = fem.assemblePatchMatrix(world.NWorldFine, world.MLocFine)
+norm_of_f = [np.sqrt(np.dot(f_trans, MFull * f_trans))]
+print('Norm of f is {}'.format(norm_of_f[0]))
+
+
+'''
 Perturbation using buildcoef2d
 '''
 
@@ -165,6 +174,7 @@ def computeIndicators(TInd):
     rPatch = lambda: coef.localizeCoefficient(patchT[TInd], a_Fine_to_be_approximated)
 
     E_vh = lod.computeErrorIndicatorCoarseFromCoefficients(patchT[TInd], csiT[TInd].muTPrime,  aPatch, rPatch)
+    E_vh *= norm_of_f[0]
 
     # this is new for E_ft
     f_ref_patch = f_ref[util.extractElementFine(world.NWorldCoarse,
@@ -175,10 +185,9 @@ def computeIndicators(TInd):
                                           world.NCoarseElement,
                                           patchT[TInd].iElementWorldCoarse,
                                           extractElements=False)]
+    E_f, E_Rf = lod.computeEftErrorIndicatorsCoarse(patchT[TInd], cetaTPrimeT[TInd], aPatch, rPatch, f_ref_patch, f_patch)
 
-    E_f = lod.computeEftErrorIndicatorCoarse(patchT[TInd], cetaTPrimeT[TInd], aPatch, rPatch, f_ref_patch, f_patch)
-
-    return E_vh, E_f
+    return E_vh, E_f, E_Rf
 
 
 
@@ -196,7 +205,7 @@ RFull = pglod.assemblePatchFunction(world, patchT, RmsiT)
 MFull = fem.assemblePatchMatrix(world.NWorldFine, world.MLocFine)
 
 print('computing error indicators',  end='', flush=True)
-E_vh, E_fT = zip(*map(computeIndicators, range(world.NtCoarse)))
+E_vh, E_fT, E_RfT = zip(*map(computeIndicators, range(world.NtCoarse)))
 print()
 
 '''
@@ -207,6 +216,10 @@ draw_indicator(NWorldCoarse, np_eps, original_style=True, Gridsize=N)
 
 np_eft = np.einsum('i,i -> i', np.ones(np.size(E_fT)), E_fT)
 draw_indicator(NWorldCoarse, np_eft, original_style=True, Gridsize=N, string='eft')
+
+np_eRft = np.einsum('i,i -> i', np.ones(np.size(E_RfT)), E_RfT)
+draw_indicator(NWorldCoarse, np_eRft, original_style=True, Gridsize=N, string='eRft')
+
 
 plt.show()
 
@@ -230,9 +243,7 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
 to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 
 if store:
-    store_all_data(ROOT, k, N, E_vh, to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans,  f_ref, aFine_trans, f_trans, np_eft = np_eft, name=name)
-
-store_all_data(ROOT, k, N, E_vh, to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans, f_ref)
+    store_all_data(ROOT, k, N, E_vh, np_eft, np_eRft, norm_of_f, to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans,  f_ref, aFine_trans, f_trans, name=name)
 
 '''
 Plot solutions

@@ -1,8 +1,8 @@
 import csv
 import numpy as np
 
-def store_all_data(ROOT, k, N, E_vh_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFine, uFineLOD,
-                   NWorldFine, NWorldCoarse, ABase, APert, f_ref, ATrans = None, f_trans = None, np_eft = None, uFineLOD_pert = None, name='test'):
+def store_all_data(ROOT, k, N, E_vh_DM, np_eft, np_eRft, norm_of_f, to_be_updatedT_DM, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFine, uFineLOD,
+                   NWorldFine, NWorldCoarse, ABase, APert, f_ref, ATrans = None, f_trans = None, uFineLOD_pert = None, name='test'):
     if ATrans is None:
         ATrans = APert
     else:
@@ -22,11 +22,20 @@ def store_all_data(ROOT, k, N, E_vh_DM, to_be_updatedT_DM, energy_errorT, tmp_er
         for val in E_vh_DM:
             writer.writerow([val])
 
-    if np_eft is not None:
-        with open('{}/{}_k{}_H{}_eft.txt'.format(ROOT, name, k, N), 'w') as csvfile:
-            writer = csv.writer(csvfile)
-            for val in np_eft:
-                writer.writerow([val])
+    with open('{}/{}_k{}_H{}_eft.txt'.format(ROOT, name, k, N), 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for val in np_eft:
+            writer.writerow([val])
+
+    with open('{}/{}_k{}_H{}_eRft.txt'.format(ROOT, name, k, N), 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for val in np_eRft:
+            writer.writerow([val])
+
+    with open('{}/{}_k{}_H{}_norm_of_f.txt'.format(ROOT, name, k, N), 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for val in norm_of_f:
+            writer.writerow([val])
 
     with open('{}/{}_k{}_H{}_to_be_updated.txt'.format(ROOT, name, k, N), 'w') as csvfile:
         writer = csv.writer(csvfile)
@@ -110,52 +119,11 @@ def store_all_data(ROOT, k, N, E_vh_DM, to_be_updatedT_DM, energy_errorT, tmp_er
             writer.writerow([val])
 
 
-def store_minimal_data(ROOT, k, N, E_vh_DM, to_be_updatedT_DM, energy_errorT, tmp_errorT, rel_energy_errorT, TOLt, uFine,
-                       uFineLOD, name = 'test'):
-    with open('{}/{}_k{}_H{}_E_vh.txt'.format(ROOT, name, k, N), 'w') as csvfile:
-        writer = csv.writer(csvfile)
-        for val in E_vh_DM:
-            writer.writerow([val])
-
-    with open('{}/{}_k{}_H{}_to_be_updated.txt'.format(ROOT ,name, k, N), 'w') as csvfile:
-        writer = csv.writer(csvfile)
-        for val in to_be_updatedT_DM:
-            writer.writerow([val])
-
-    with open('{}/{}_k{}_H{}_error.txt'.format(ROOT, name, k, N), 'w') as csvfile:
-        writer = csv.writer(csvfile)
-        for val in energy_errorT:
-            writer.writerow([val])
-
-    with open('{}/{}_k{}_H{}_tmp_error.txt'.format(ROOT, name, k, N), 'w') as csvfile:
-        writer = csv.writer(csvfile)
-        for val in tmp_errorT:
-            writer.writerow([val])
-
-    with open('{}/{}_k{}_H{}_rel_error.txt'.format(ROOT, name, k, N), 'w') as csvfile:
-        writer = csv.writer(csvfile)
-        for val in rel_energy_errorT:
-            writer.writerow([val])
-
-    with open('{}/{}_TOLs_k{}_H{}.txt'.format(ROOT, name, k, N), 'w') as csvfile:
-        writer = csv.writer(csvfile)
-        for val in TOLt:
-            writer.writerow([val])
-
-    with open('{}/{}_uFine_k{}_H{}.txt'.format(ROOT, name, k, N), 'w') as csvfile:
-        writer = csv.writer(csvfile)
-        for val in uFine:
-            writer.writerow([val])
-
-    with open('{}/{}_uFineLOD_k{}_H{}.txt'.format(ROOT, name, k, N), 'w') as csvfile:
-        writer = csv.writer(csvfile)
-        for val in uFineLOD:
-            writer.writerow([val])
-
-
 def restore_all_data(ROOT, k, N, name = 'test'):
     E_vh_DM = []
     eft = []
+    eRft = []
+    norm_of_f = []
     complete_tol_DM = []
     complete_errors = []
     tmp_errors = []
@@ -178,15 +146,24 @@ def restore_all_data(ROOT, k, N, name = 'test'):
         E_vh_DM.append(float(val[0]))
     f.close()
 
-    try:
-        f = open('{}/{}_k{}_H{}_eft.txt'.format(ROOT, name, k, N), 'r')
-        reader = csv.reader(f)
-        for val in reader:
-            eft.append(float(val[0]))
-        f.close()
-        eft_ = True
-    except:
-        eft_ = False
+    f = open('{}/{}_k{}_H{}_eft.txt'.format(ROOT, name, k, N), 'r')
+    reader = csv.reader(f)
+    for val in reader:
+        eft.append(float(val[0]))
+    f.close()
+
+    f = open('{}/{}_k{}_H{}_eRft.txt'.format(ROOT, name, k, N), 'r')
+    reader = csv.reader(f)
+    for val in reader:
+        eRft.append(float(val[0]))
+    f.close()
+
+    f = open('{}/{}_k{}_H{}_norm_of_f.txt'.format(ROOT, name, k, N), 'r')
+    reader = csv.reader(f)
+    for val in reader:
+        norm_of_f.append(float(val[0]))
+    f.close()
+
 
     f = open("{}/{}_TOLs_k{}_H{}.txt".format(ROOT, name, k, N), 'r')
     reader = csv.reader(f)
@@ -287,10 +264,7 @@ def restore_all_data(ROOT, k, N, name = 'test'):
         f_trans = np.append(f_trans, [float(val[0])])
     f.close()
 
-    if eft_:
-        return E_vh_DM, complete_tol_DM, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans, eft
-    else:
-        return E_vh_DM, complete_tol_DM, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans
+    return E_vh_DM, eft, eRft, norm_of_f, complete_tol_DM, complete_errors, tmp_errors, rel_errors, TOLt, uFine, uFineLOD, uFineLOD_pert, NWorldCoarse, NWorldFine, a_ref, a_pert, a_trans, f_ref, f_trans
 
 
 def restore_minimal_data(ROOT, k, N, name = 'test'):

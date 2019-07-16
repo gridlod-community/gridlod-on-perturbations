@@ -12,12 +12,12 @@ from matplotlib import cm
 from gridlod import util
 
 
-def drawCoefficient_origin(N, a):
+def drawCoefficient_origin(N, a, transformed = False):
     # This is drawCoefficient from test_pgtransport.py in gridlod
     if a.ndim == 3:
         a = np.linalg.norm(a, axis=(1, 2), ord=2)
 
-    aCube = np.log10(a.reshape(N, order='F'))
+    aCube = a.reshape(N, order='F')
     aCube = np.ascontiguousarray(aCube.T)
 
     plt.clf()
@@ -26,9 +26,16 @@ def drawCoefficient_origin(N, a):
 
     plt.imshow(aCube,
                origin='lower_left',
-               interpolation='none', cmap=cmap)
+               interpolation='none', cmap=cmap,
+               norm=matplotlib.colors.LogNorm())
     plt.xticks([])
     plt.yticks([])
+    if transformed:
+        cb = plt.colorbar()
+        font_size = 14  # Adjust as appropriate.
+        cb.ax.tick_params(labelsize=font_size)
+        cb.set_ticks([0.1,1,10])
+
 
 def draw_f(N, a):
     aCube = a.reshape(N, order='F')
@@ -39,14 +46,16 @@ def draw_f(N, a):
     cmap = plt.cm.hot_r
 
     if np.isclose(np.linalg.norm(a),0):
-        im = plt.imshow(aCube,
+        plt.imshow(aCube,
                    origin='lower_left',
                    interpolation='none', cmap=cmap)
     else:
-        im = plt.imshow(aCube,
+        plt.imshow(aCube,
                    origin='lower_left',
                    interpolation='none', cmap=cmap)
-    plt.colorbar()
+    cb = plt.colorbar()
+    font_size = 14  # Adjust as appropriate.
+    cb.ax.tick_params(labelsize=font_size)
     plt.xticks([])
     plt.yticks([])
 
@@ -89,7 +98,9 @@ def draw_indicator(N, a, colorbar=True, original_style = True, Gridsize = 4, str
     ax.grid(which='both')
     ax.grid(which='major', linestyle="-", color="grey", alpha=0.4)
     if colorbar:
-        fig.colorbar(im)
+        cb = fig.colorbar(im)
+        font_size = 14  # Adjust as appropriate.
+        cb.ax.tick_params(labelsize=font_size)
 
 def d3sol(N, s, String='FinescaleSolution'):
     '''
