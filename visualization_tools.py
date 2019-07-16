@@ -12,7 +12,7 @@ from matplotlib import cm
 from gridlod import util
 
 
-def drawCoefficient_origin(N, a, transformed = False):
+def drawCoefficient_origin(N, a, transformed = False, lim=None):
     # This is drawCoefficient from test_pgtransport.py in gridlod
     if a.ndim == 3:
         a = np.linalg.norm(a, axis=(1, 2), ord=2)
@@ -23,11 +23,17 @@ def drawCoefficient_origin(N, a, transformed = False):
     plt.clf()
 
     cmap = plt.cm.hot_r
+    if lim is not None:
+        plt.imshow(aCube,
+                   origin='lower_left',
+                   interpolation='none', cmap=cmap,
+                   norm=matplotlib.colors.LogNorm(), vmax=lim[0], vmin=lim[1])
+    else:
+        plt.imshow(aCube,
+                   origin='lower_left',
+                   interpolation='none', cmap=cmap,
+                   norm=matplotlib.colors.LogNorm())
 
-    plt.imshow(aCube,
-               origin='lower_left',
-               interpolation='none', cmap=cmap,
-               norm=matplotlib.colors.LogNorm())
     plt.xticks([])
     plt.yticks([])
     if transformed:

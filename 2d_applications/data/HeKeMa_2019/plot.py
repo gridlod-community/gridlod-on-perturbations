@@ -15,7 +15,7 @@ matplotlib.rcParams['pdf.use14corefonts'] = True
 # just change the ROOT for ex1 - ex3
 ROOT = 'ex3'
 name = 'test'
-extract_figures_to_files = True
+extract_figures_to_files = False
 FIGURE_OUTPUTS = ['png']
 
 
@@ -34,15 +34,26 @@ ax1 = fig.add_subplot(111)
 to_be_updated.append(100)
 complete_errors.append(complete_errors[-1])
 rel_errors.append(rel_errors[-1])
+TOLt.insert(0,TOLt[0]+1e-5)
 
-# line1 = ax1.semilogy(to_be_updated, complete_errors, 'r--', label='error')
-line2 = ax1.semilogy(to_be_updated, rel_errors, 'g--', label='relative error', linewidth=2)
-plt.ylabel('relative error', size=14)
+line1 = ax1.semilogy(to_be_updated, rel_errors, 'g', label='$e_{TOL}$', linewidth=1)
+ax1.set_ylabel('$e_{TOL}$', size=14)
 plt.xlabel('updates in %', size=14)
-plt.ylim([0.0008,0.15])
-plt.yticks(size=14)
+ax1.set_ylim([0.0008,0.15])
+for tick in ax1.xaxis.get_major_ticks():
+    tick.label.set_fontsize(14)
+
 plt.xticks(np.arange(0,110,10), size=14)
 plt.grid(alpha=0.5)
+
+ax2 = ax1.twinx()
+line2 = ax2.semilogy(to_be_updated, TOLt, 'k--', label='TOL', alpha=0.5)
+ax2.set_ylabel('TOL', size=14)
+for tick in ax2.xaxis.get_major_ticks():
+    tick.label.set_fontsize(14)
+
+ax1.legend(loc='lower left')
+ax2.legend()
 
 plt.savefig("tikz/{}_{}_errorplot.pdf".format(ROOT,name), bbox_inches='tight', dpi=1200)
 
@@ -72,20 +83,26 @@ plot data
 '''
 
 plt.figure("Coefficient")
-drawCoefficient_origin(NFine, a_ref)
+if ROOT == "ex2":
+    lim = [np.max(a_trans),np.min(a_trans)]   # for ex2
+elif ROOT == "ex3":
+    lim = [np.max(a_trans),np.min(a_ref)]   # for ex3
+else:
+    lim = None
+drawCoefficient_origin(NFine, a_ref, lim=lim)
 if extract_figures_to_files:
     for fmt in FIGURE_OUTPUTS:
         plt.savefig("tikz/{}_{}_original.{}".format(ROOT,name,fmt), bbox_inches='tight', dpi=1200)
 
 
 plt.figure("Perturbed coefficient")
-drawCoefficient_origin(NFine, a_pert)
+drawCoefficient_origin(NFine, a_pert, lim=lim)
 if extract_figures_to_files:
     for fmt in FIGURE_OUTPUTS:
         plt.savefig("tikz/{}_{}_perturbed.{}".format(ROOT,name,fmt), bbox_inches='tight', dpi=1200)
 
 plt.figure('transformed')
-drawCoefficient_origin(NFine, a_trans, transformed=True)
+drawCoefficient_origin(NFine, a_trans, transformed=True, lim=lim)
 if extract_figures_to_files:
     for fmt in FIGURE_OUTPUTS:
         plt.savefig("tikz/{}_{}_transformed.{}".format(ROOT,name,fmt), bbox_inches='tight', dpi=1200)
@@ -125,4 +142,4 @@ ax.imshow(np.reshape(uFineLOD, np.array([NFine[0],NFine[1]])+1), origin='lower_l
 ax.set_xticks([])
 ax.set_yticks([])
 
-plt.show()
+# plt.show()
