@@ -12,7 +12,7 @@ from gridlod.world import World, Patch
 
 class AdaptiveAlgorithm:
     def __init__(self, world, k, boundaryConditions, a_Fine_to_be_approximated, aFine_ref, f_trans, E_vh, KmsijT,
-                 correctorsListT, patchT, RmsijT, correctorsRhsT, MFull, uFineFull_trans=None, AFine_trans=None, StartingTolerance=100):
+                 correctorsListT, patchT, RmsijT, correctorsRhsT, MFull, uFineFull_trans=None, AFine_trans=None, StartingTolerance=100, ):
         self.world = world
         self.k = k
         self.boundaryConditions = boundaryConditions
@@ -198,7 +198,7 @@ class AdaptiveAlgorithm:
 class PercentageVsErrorAlgorithm:
     def __init__(self, world, k, boundaryConditions, a_Fine_to_be_approximated, aFine_ref, f_trans, E_vh, KmsijT,
                  correctorsListT, patchT, RmsijT, correctorsRhsT, MFull, uFineFull_trans, AFine_trans, E_f = [],
-                 computing_options='both'):
+                 computing_options='both', compare_with_best_LOD = False, u_best_LOD = None):
         self.world = world
         self.k = k
         self.boundaryConditions = boundaryConditions
@@ -216,6 +216,8 @@ class PercentageVsErrorAlgorithm:
         self.uFineFull_trans = uFineFull_trans
         self.AFine_trans = AFine_trans
         self.computing_options = computing_options
+        self.compare_with_best_LOD = compare_with_best_LOD
+        self.u_best_LOD = u_best_LOD
 
         self.init = 1
 
@@ -366,9 +368,15 @@ class PercentageVsErrorAlgorithm:
 
 
             # actual error
-            energy_error = np.sqrt(
-                np.dot((uFineFull_trans_LOD - self.uFineFull_trans),
-                       self.AFine_trans * (uFineFull_trans_LOD - self.uFineFull_trans)))
+            if self.compare_with_best_LOD:
+                energy_error = np.sqrt(
+                    np.dot((uFineFull_trans_LOD - self.u_best_LOD),
+                           self.AFine_trans * (uFineFull_trans_LOD - self.u_best_LOD)))
+            else:
+                energy_error = np.sqrt(
+                    np.dot((uFineFull_trans_LOD - self.uFineFull_trans),
+                           self.AFine_trans * (uFineFull_trans_LOD - self.uFineFull_trans)))
+
 
             uFineFull_trans_LOD_old = uFineFull_trans_LOD
 
@@ -390,7 +398,8 @@ class PercentageVsErrorAlgorithm:
 
 class PercentageVsErrorAlgorithm_NO_TOLS:
     def __init__(self, world, k, boundaryConditions, a_Fine_to_be_approximated, aFine_ref, f_trans, E_vh, KmsijT,
-                 correctorsListT, patchT, RmsijT, correctorsRhsT, MFull, uFineFull_trans, AFine_trans):
+                 correctorsListT, patchT, RmsijT, correctorsRhsT, MFull, uFineFull_trans, AFine_trans,
+                 compare_with_best_LOD = False, u_best_LOD = None):
         self.world = world
         self.k = k
         self.boundaryConditions = boundaryConditions
@@ -406,6 +415,8 @@ class PercentageVsErrorAlgorithm_NO_TOLS:
         self.MFull = MFull
         self.uFineFull_trans = uFineFull_trans
         self.AFine_trans = AFine_trans
+        self.compare_with_best_LOD = compare_with_best_LOD
+        self.u_best_LOD = u_best_LOD
 
         self.init = 1
 
@@ -532,9 +543,15 @@ class PercentageVsErrorAlgorithm_NO_TOLS:
 
 
             # actual error
-            energy_error = np.sqrt(
-                np.dot((uFineFull_trans_LOD - self.uFineFull_trans),
-                       self.AFine_trans * (uFineFull_trans_LOD - self.uFineFull_trans)))
+
+            if self.compare_with_best_LOD:
+                energy_error = np.sqrt(
+                    np.dot((uFineFull_trans_LOD - self.u_best_LOD),
+                           self.AFine_trans * (uFineFull_trans_LOD - self.u_best_LOD)))
+            else:
+                energy_error = np.sqrt(
+                    np.dot((uFineFull_trans_LOD - self.uFineFull_trans),
+                           self.AFine_trans * (uFineFull_trans_LOD - self.uFineFull_trans)))
 
             uFineFull_trans_LOD_old = uFineFull_trans_LOD
 
