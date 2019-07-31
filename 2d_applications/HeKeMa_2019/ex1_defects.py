@@ -13,10 +13,10 @@ from gridlod.world import World, Patch
 from MasterthesisLOD import buildcoef2d
 from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin
 
-import algorithms
+import gridlod_on_perturbations.algorithms as algorithms
 from gridlod_on_perturbations.data import store_all_data
 
-from visualization_tools import draw_f, draw_indicator
+from gridlod_on_perturbations.visualization_tools import draw_f, draw_indicator
 
 ROOT = '../../2d_applications/data/HeKeMa_2019/ex1'
 
@@ -28,7 +28,7 @@ fine = 2**potenz
 
 store = True
 name = 'test'
-N = 2**5
+N = 2**2
 print('log H: ' ,np.abs(np.log(np.sqrt(2*(1./N**2)))))
 k = 4  # goes like log H
 
@@ -143,6 +143,32 @@ a_Fine_to_be_approximated = aFine_trans
 Compute PGLOD 
 '''
 
+def real_computeKmsij(TInd):
+    print('.', end='', flush=True)
+    patch = Patch(world, k, TInd)
+    IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
+    aPatch = lambda: coef.localizeCoefficient(patch, a_Fine_to_be_approximated)
+
+    correctorsList = lod.computeBasisCorrectors(patch, IPatch, aPatch)
+    csi = lod.computeBasisCoarseQuantities(patch, correctorsList, aPatch)
+    return patch, correctorsList, csi.Kmsij, csi
+
+def real_computeRmsi(TInd):
+    print('.', end='', flush=True)
+    patch = Patch(world, k, TInd)
+    IPatch = lambda: interp.L2ProjectionPatchMatrix(patch, boundaryConditions)
+    aPatch = lambda: coef.localizeCoefficient(patch, a_Fine_to_be_approximated)
+    MRhsList = [f_ref[util.extractElementFine(world.NWorldCoarse,
+                                          world.NCoarseElement,
+                                          patch.iElementWorldCoarse,
+                                          extractElements=False)]];
+
+    correctorRhs = lod.computeElementCorrector(patch, IPatch, aPatch, None, MRhsList)[0]
+    Rmsi, cetaTPrime = lod.computeRhsCoarseQuantities(patch, correctorRhs, aPatch, True)
+
+    return patch, correctorRhs, Rmsi, cetaTPrime
+
+
 def computeKmsij(TInd):
     print('.', end='', flush=True)
     patch = Patch(world, k, TInd)
@@ -194,6 +220,39 @@ def computeIndicators(TInd):
 print('precomputing ....')
 
 # Use mapper to distribute computations (mapper could be the 'map' built-in or e.g. an ipyparallel map)
+print('computing real correctors',  end='', flush=True)
+patchT, correctorsListT, KmsijT, csiT = zip(*map(real_computeKmsij, range(world.NtCoarse)))
+print()
+print('computing real right hand side correctors',  end='', flush=True)
+patchT, correctorRhsT, RmsiT, cetaTPrimeT = zip(*map(real_computeRmsi, range(world.NtCoarse)))
+print()
+
+KFull = pglod.assembleMsStiffnessMatrix(world, patchT, KmsijT)
+RFull = pglod.assemblePatchFunction(world, patchT, RmsiT)
+MFull = fem.assemblePatchMatrix(world.NWorldFine, world.MLocFine)
+
+Rf = pglod.assemblePatchFunction(world, patchT, correctorRhsT)
+
+basis = fem.assembleProlongationMatrix(world.NWorldCoarse, world.NCoarseElement)
+
+bFull = basis.T * MFull * f_trans - RFull
+
+basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
+modifiedBasis = basis - basisCorrectors
+
+uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
+
+uLodFine = modifiedBasis * uFull
+uLodFine += Rf
+
+u_best_LOD = uLodFine
+
+energy_norm = np.sqrt(np.dot(u_best_LOD, AFine_trans * u_best_LOD))
+energy_error = np.sqrt(np.dot((uFineFull_trans - u_best_LOD), AFine_trans * (uFineFull_trans - u_best_LOD)))
+print("Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error, energy_error/energy_norm))
+
+
+# Use mapper to distribute computations (mapper could be the 'map' built-in or e.g. an ipyparallel map)
 print('computing correctors',  end='', flush=True)
 patchT, correctorsListT, KmsijT, csiT = zip(*map(computeKmsij, range(world.NtCoarse)))
 print()
@@ -238,12 +297,18 @@ Algorithm = algorithms.PercentageVsErrorAlgorithm(world = world,
                                                  correctorsRhsT = correctorRhsT,
                                                  MFull = MFull,
                                                  uFineFull_trans = uFineFull_trans,
-                                                 AFine_trans = AFine_trans)
+                                                 AFine_trans = AFine_trans,
+                                                  compare_with_best_LOD=True,
+                                                  u_best_LOD=u_best_LOD)
 
 to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans_LOD = Algorithm.StartAlgorithm()
 
 if store:
     store_all_data(ROOT, k, N, E_vh, np_eft, np_eRft, norm_of_f, to_be_updatedT, energy_errorT, tmp_errorT, rel_errorT, TOLt, uFineFull_trans, uFineFull_trans_LOD, NFine, NWorldCoarse, aFine_ref, aFine_trans,  f_ref, aFine_trans, f_trans, name=name)
+
+energy_error = np.sqrt(np.dot((uFineFull_trans_LOD - u_best_LOD), AFine_trans * (uFineFull_trans_LOD - u_best_LOD)))
+print("Energy norm {}, error {}, rel. error {}".format(energy_norm, energy_error, energy_error/energy_norm))
+
 
 '''
 Plot solutions

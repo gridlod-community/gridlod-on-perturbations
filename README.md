@@ -1,13 +1,13 @@
 # gridlod-on-perturbations
 
 ```
-# This file is part of the project for "Localization of multiscale problems with random defects":
+# This file is part of the project for "Numerical Upscaling of perturbed diffsuion problems":
 #   https://github.com/gridlod-community/gridlod-on-perturbations.git
 # Copyright holder: Tim Keil, Fredrik Hellman 
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
 ```
 
-This repository contains the application code for python module 'gridlod'. This module has been used and developed by Fredrik Hellman and Axel Målqvist on https://github.com/fredrikhellman/gridlod. Our repository provides further classes, that work as an extension of 'gridlod' and enable an efficient construction of two dimensional coefficients. 
+This repository contains the application code for python module 'gridlod'. This module has been developed by Fredrik Hellman and Tim Keil on https://github.com/fredrikhellman/gridlod. Our repository provides further classes, that work as an extension of 'gridlod' and enable an efficient construction of two dimensional coefficients. 
 
 ## Setup
 
@@ -59,7 +59,7 @@ pip install scikit-sparse
 Now, link gridlod to our folder that enables to use it as a module (sudo required).
 
 ```
-echo $PWD > $(python -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())')/gridlod.pth
+echo $PWD/gridlod/ > $(python -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())')/gridlod.pth
 echo $PWD/gridlod-on-perturbations/ > $(python -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())')/gridlod-on-perturbations.pth
 ```
 

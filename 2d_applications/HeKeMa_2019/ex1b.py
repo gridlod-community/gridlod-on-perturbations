@@ -236,7 +236,7 @@ Rf = pglod.assemblePatchFunction(world, patchT, correctorRhsT)
 
 basis = fem.assembleProlongationMatrix(world.NWorldCoarse, world.NCoarseElement)
 
-bFull = basis.T * MFull * f_trans - RFull
+bFull = basis.T * MFull * f_trans # - RFull
 
 basisCorrectors = pglod.assembleBasisCorrectors(world, patchT, correctorsListT)
 modifiedBasis = basis - basisCorrectors
@@ -244,7 +244,7 @@ modifiedBasis = basis - basisCorrectors
 uFull, _ = pglod.solve(world, KFull, bFull, boundaryConditions)
 
 uLodFine = modifiedBasis * uFull
-uLodFine += Rf
+# uLodFine += Rf
 
 u_best_LOD = uLodFine
 

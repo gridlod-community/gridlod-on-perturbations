@@ -105,7 +105,7 @@ def draw_indicator(N, a, colorbar=True, original_style = True, Gridsize = 4, str
     ax.grid(which='major', linestyle="-", color="grey", alpha=0.4)
     if colorbar:
         cb = fig.colorbar(im)
-        font_size = 14  # Adjust as appropriate.
+        font_size = 16  # Adjust as appropriate.
         cb.ax.tick_params(labelsize=font_size)
 
 def d3sol(N, s, String='FinescaleSolution'):

@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from gridlod_on_perturbations.data import restore_all_data
-import matplotlib2tikz
-from visualization_tools import drawCoefficient_origin, draw_f, draw_indicator
+from gridlod_on_perturbations.visualization_tools import drawCoefficient_origin, draw_f, draw_indicator
 from matplotlib import cm
 import matplotlib
 # matplotlib.style.use('ggplot')
@@ -13,10 +12,10 @@ matplotlib.rcParams['pdf.use14corefonts'] = True
 # matplotlib.rcParams['text.usetex'] = True
 
 # just change the ROOT for ex1 - ex3
-ROOT = 'ex3'
+ROOT = 'ex1'
 name = 'test'
-extract_figures_to_files = False
-FIGURE_OUTPUTS = ['png']
+extract_figures_to_files = True
+FIGURE_OUTPUTS = ['.png']
 
 
 k = 4
@@ -28,35 +27,31 @@ E_vh, eft, eRft, norm_of_f, to_be_updated, complete_errors, tmp_errors, rel_erro
 Plot errors
 '''
 
-fig = plt.figure('error',figsize=(8,4))
+fig = plt.figure('error')
 ax1 = fig.add_subplot(111)
-
 to_be_updated.append(100)
-complete_errors.append(complete_errors[-1])
-rel_errors.append(rel_errors[-1])
+complete_errors.append(0)
+rel_errors.append(0)
 TOLt.insert(0,TOLt[0]+1e-5)
 
-line1 = ax1.semilogy(to_be_updated, rel_errors, 'g', label='$e_{TOL}$', linewidth=1)
-ax1.set_ylabel('$e_{TOL}$', size=14)
-plt.xlabel('updates in %', size=14)
-ax1.set_ylim([0.0008,0.15])
+line1 = ax1.semilogy(to_be_updated, rel_errors, 'g', label='$\mathcal{E}_{rel}$', linewidth=1)
+plt.xlabel('updates in %', size=16)
+# ax1.set_ylim([0.0008,0.15])
 for tick in ax1.xaxis.get_major_ticks():
     tick.label.set_fontsize(14)
 
-plt.xticks(np.arange(0,110,10), size=14)
+plt.xticks(np.arange(0,110,10), size=16)
+plt.yticks(size=16)
 plt.grid(alpha=0.5)
 
-ax2 = ax1.twinx()
-line2 = ax2.semilogy(to_be_updated, TOLt, 'k--', label='TOL', alpha=0.5)
-ax2.set_ylabel('TOL', size=14)
-for tick in ax2.xaxis.get_major_ticks():
-    tick.label.set_fontsize(14)
+line2 = ax1.semilogy(to_be_updated, TOLt, 'k--', label='TOL', alpha=0.5)
 
-ax1.legend(loc='lower left')
-ax2.legend()
+ax1.legend(loc='upper right', fontsize=16)
+
 
 plt.savefig("tikz/{}_{}_errorplot.pdf".format(ROOT,name), bbox_inches='tight', dpi=1200)
 
+plt.show()
 '''
 Plot error indicator
 '''
