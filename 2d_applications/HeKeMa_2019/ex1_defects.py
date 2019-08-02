@@ -1,4 +1,4 @@
-# This file is part of the project for "Localization of multiscale problems with random defects":
+# This file is part of the project for "Numerical upscaling of perturbed diffusion problems":
 #   https://github.com/gridlod-community/gridlod-on-perturbations.git
 # Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)

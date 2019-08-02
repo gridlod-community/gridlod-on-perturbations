@@ -1,4 +1,4 @@
-# This file is part of the project for "Localization of multiscale problems with random defects":
+# This file is part of the OWR report "Multiscale methods for perturbed diffusion problems":
 #   https://github.com/gridlod-community/gridlod-on-perturbations.git
 # Copyright holder: Tim Keil, Fredrik Hellmann
 # License: BSD 2-Clause License (http://opensource.org/licenses/BSD-2-Clause)
@@ -18,7 +18,7 @@ from gridlod_on_perturbations.data import store_all_data
 
 from gridlod_on_perturbations.visualization_tools import draw_f, draw_indicator
 
-ROOT = '../../2d_applications/data/HeKeMa_2019/ex1b'
+ROOT = '../../2d_applications/data/HeKeMa_2019/exOWR'
 
 # Set global variables for the computation
 

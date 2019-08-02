@@ -11,7 +11,7 @@ matplotlib.rcParams['ps.useafm'] = True
 matplotlib.rcParams['pdf.use14corefonts'] = True
 # matplotlib.rcParams['text.usetex'] = True
 
-# just change the ROOT for ex1 - ex3
+# just change the ROOT for ex1 - ex3 and exOWR
 ROOT = 'ex1'
 name = 'test'
 extract_figures_to_files = True
