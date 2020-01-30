@@ -23,6 +23,7 @@ def drawCoefficient_origin(N, a, transformed = False, lim=None):
     plt.clf()
 
     cmap = plt.cm.hot_r
+    # cmap = plt.cm.inferno_r
     if lim is not None:
         plt.imshow(aCube,
                    origin='lower_left',
@@ -41,6 +42,7 @@ def drawCoefficient_origin(N, a, transformed = False, lim=None):
         font_size = 14  # Adjust as appropriate.
         cb.ax.tick_params(labelsize=font_size)
         cb.set_ticks([0.1,1,10])
+    # plt.colorbar()
 
 
 def draw_f(N, a):
