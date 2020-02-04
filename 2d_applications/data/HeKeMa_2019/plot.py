@@ -12,9 +12,9 @@ matplotlib.rcParams['pdf.use14corefonts'] = True
 # matplotlib.rcParams['text.usetex'] = True
 
 # just change the ROOT for ex1 - ex3 and exOWR
-ROOT = 'ex3_noisy'
+ROOT = 'ex2_noisy'
 name = 'test'
-extract_figures_to_files = False
+extract_figures_to_files = True
 FIGURE_OUTPUTS = ['png']
 dpi = None
 
